@@ -30,6 +30,6 @@ class Settings:
     # Admin & Support
     ADMIN_SECRET: str = os.getenv("ADMIN_SECRET", "admin-pass-2026")
     ADMIN_DISCORD_IDS: str = os.getenv("ADMIN_DISCORD_IDS", "1519726876984086528")
-    DISCORD_INVITE_URL: str = os.getenv("DISCORD_INVITE_URL", "https://discord.gg/")
+    DISCORD_INVITE_URL: str = os.getenv("DISCORD_INVITE_URL", "https://discord.gg/N7Kuayuzxb")
 
 settings = Settings()
