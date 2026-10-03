@@ -1,0 +1,12 @@
+services:
+  portal:
+    build: .
+    container_name: ai-gateway-portal
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./.env:/app/.env
+      - ./portal.db:/app/portal.db
+    environment:
+      - PYTHONUNBUFFERED=1

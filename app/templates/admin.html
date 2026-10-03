@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | AI Gateway</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { 
+            background-color: #09090b; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+    </style>
+</head>
+<body class="text-zinc-100 min-h-screen flex flex-col antialiased">
+
+    <!-- Top Bar -->
+    <header class="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2">
+            <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
+                <a href="/" class="p-1.5 sm:p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-md transition" title="Back to Portal">
+                    <i class="fa-solid fa-arrow-left text-xs"></i>
+                </a>
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-shield-halved text-indigo-400 text-sm"></i>
+                    <span class="font-semibold text-xs sm:text-sm tracking-wide uppercase text-zinc-200 whitespace-nowrap">Admin<span class="hidden sm:inline"> Control Center</span></span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
+                <span class="text-xs text-zinc-400 font-mono"><span class="hidden sm:inline">Logged in as: </span><strong class="text-zinc-200">{{ user.username }}</strong></span>
+                <a href="/auth/logout" title="Sign Out" class="p-1.5 sm:p-2 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 rounded-md transition">
+                    <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- Stats Overview (2x2 on Mobile, 4 Cols on Desktop) -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-indigo-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
+                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
+                    <span class="truncate font-medium">Total Users</span>
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
+                        <i class="fa-solid fa-users text-xs sm:text-sm"></i>
+                    </div>
+                </div>
+                <div class="text-lg sm:text-2xl font-bold font-mono text-zinc-100">{{ stats.total_users }}</div>
+            </div>
+
+            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-cyan-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
+                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
+                    <span class="truncate font-medium">Active VIP</span>
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
+                        <i class="fa-solid fa-crown text-xs sm:text-sm"></i>
+                    </div>
+                </div>
+                <div class="text-lg sm:text-2xl font-bold font-mono text-cyan-400">{{ stats.total_vip }}</div>
+            </div>
+
+            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-sky-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
+                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
+                    <span class="truncate font-medium">Tokens Today</span>
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
+                        <i class="fa-solid fa-chart-line text-xs sm:text-sm"></i>
+                    </div>
+                </div>
+                <div class="text-base sm:text-2xl font-bold font-mono text-zinc-100 truncate">{{ "{:,}".format(stats.total_tokens_today) }}</div>
+            </div>
+
+            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-emerald-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
+                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
+                    <span class="truncate font-medium">Requests Today</span>
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
+                        <i class="fa-solid fa-bolt text-xs sm:text-sm"></i>
+                    </div>
+                </div>
+                <div class="text-lg sm:text-2xl font-bold font-mono text-emerald-400">{{ "{:,}".format(stats.requests_today) }}</div>
+            </div>
+        </div>
+
+        <!-- Section: System Configuration -->
+        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-6">
+            <div class="border-b border-zinc-800/80 pb-4">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
+                    <i class="fa-solid fa-sliders text-zinc-400"></i>
+                    <span>Live Gateway Settings</span>
+                </h2>
+                <p class="text-xs text-zinc-400 mt-1">Changes take effect immediately without restarting the server.</p>
+            </div>
+
+            <form action="/api/admin/settings" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">Daily Free Tokens Quota</label>
+                    <input type="number" name="daily_free_tokens" value="{{ settings.daily_free_tokens }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">Master 9Router Upstream URL</label>
+                    <input type="text" name="master_router_url" value="{{ settings.master_router_url }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">Master 9Router API Key</label>
+                    <input type="password" name="master_router_key" value="{{ settings.master_router_key }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">Discord Contact / Support Invite URL</label>
+                    <input type="text" name="discord_invite_url" value="{{ settings.discord_invite_url }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">VIP Daily Price (THB)</label>
+                    <input type="number" name="vip_daily_price" value="{{ settings.vip_daily_price }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">VIP Weekly Price (THB)</label>
+                    <input type="number" name="vip_weekly_price" value="{{ settings.vip_weekly_price }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="md:col-span-2 pt-2">
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-semibold transition">
+                        Save System Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Section: User Management Table -->
+        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-6">
+            <div class="flex items-center justify-between border-b border-zinc-800/80 pb-4">
+                <div>
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
+                        <i class="fa-solid fa-users-gear text-zinc-400"></i>
+                        <span>User Accounts & Subscriptions</span>
+                    </h2>
+                    <p class="text-xs text-zinc-400 mt-1">Manage tiers, grant VIP passes, reset quotas, and control access.</p>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="text-zinc-500 uppercase tracking-wider border-b border-zinc-800 font-mono text-[11px]">
+                        <tr>
+                            <th class="py-3 px-3">User</th>
+                            <th class="py-3 px-3">Tier</th>
+                            <th class="py-3 px-3">Today Usage</th>
+                            <th class="py-3 px-3">VIP Expiry</th>
+                            <th class="py-3 px-3">Status</th>
+                            <th class="py-3 px-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-800/60">
+                        {% for u in users %}
+                        <tr class="hover:bg-zinc-800/30 transition">
+                            <td class="py-3 px-3">
+                                <div class="flex items-center space-x-2.5">
+                                    <img src="{{ u.avatar_url }}" alt="avatar" class="h-6 w-6 rounded-full border border-zinc-700">
+                                    <div>
+                                        <div class="font-medium text-zinc-200">{{ u.username }}</div>
+                                        <div class="text-[10px] text-zinc-500 font-mono select-all">{{ u.id }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3 px-3">
+                                {% if u.tier == 'vip' %}
+                                <span class="px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 font-semibold font-mono text-[10px]">VIP</span>
+                                {% else %}
+                                <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono text-[10px]">FREE</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-3 font-mono text-zinc-300">
+                                {{ "{:,}".format(u.daily_token_usage) }}
+                            </td>
+                            <td class="py-3 px-3 font-mono text-zinc-400">
+                                {{ u.vip_expires_at[:16].replace('T', ' ') if u.vip_expires_at else '-' }}
+                            </td>
+                            <td class="py-3 px-3">
+                                {% if u.is_banned %}
+                                <span class="text-rose-400 font-medium">Suspended</span>
+                                {% else %}
+                                <span class="text-emerald-400 font-medium">Active</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-3 text-right space-x-1.5 whitespace-nowrap">
+                                <button onclick="upgradeVip('{{ u.id }}', 1)" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-[11px] transition">+1d VIP</button>
+                                <button onclick="upgradeVip('{{ u.id }}', 7)" class="px-2 py-1 rounded bg-indigo-900/40 hover:bg-indigo-800/50 text-indigo-300 border border-indigo-700 text-[11px] transition">+7d VIP</button>
+                                {% if u.tier == 'vip' %}
+                                <button onclick="revokeVip('{{ u.id }}')" class="px-2 py-1 rounded bg-violet-900/40 hover:bg-violet-800/50 text-violet-300 border border-violet-700 text-[11px] transition font-medium" title="Cancel/Reset VIP to Free">Revoke VIP</button>
+                                {% endif %}
+                                <button onclick="resetQuota('{{ u.id }}')" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border border-zinc-700 text-[11px] transition" title="Reset Today's Tokens"><i class="fa-solid fa-rotate-left"></i></button>
+                                <button onclick="toggleBan('{{ u.id }}')" class="px-2 py-1 rounded {% if u.is_banned %}bg-emerald-900/30 text-emerald-300 border-emerald-800{% else %}bg-rose-900/30 text-rose-300 border-rose-800{% endif %} border text-[11px] transition">
+                                    {% if u.is_banned %}Unban{% else %}Ban{% endif %}
+                                </button>
+                                <button onclick="deleteUser('{{ u.id }}', '{{ u.username }}')" class="px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 text-rose-400 hover:text-rose-200 border border-rose-800 text-[11px] transition" title="Delete User"><i class="fa-solid fa-trash"></i></button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-zinc-800/80 py-6 text-xs text-zinc-500">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span>© 2026 Ai Gateway. All rights reserved.</span>
+            <span>by ffxlm</span>
+        </div>
+    </footer>
+
+    <script>
+        async function upgradeVip(userId, days) {
+            const res = await fetch('/api/admin/upgrade-vip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, days: days })
+            });
+            if (res.ok) window.location.reload();
+        }
+
+        async function revokeVip(userId) {
+            if (!confirm('Are you sure you want to revoke VIP and reset this user back to Free tier?')) return;
+            const res = await fetch('/api/admin/revoke-vip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            });
+            if (res.ok) window.location.reload();
+        }
+
+        async function deleteUser(userId, username) {
+            if (!confirm(`Permanently delete user "${username}" (ID: ${userId})? This will delete all their keys and history.`)) return;
+            const res = await fetch('/api/admin/delete-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            });
+            if (res.ok) window.location.reload();
+        }
+
+        async function resetQuota(userId) {
+            if (!confirm('Reset token quota to 0 for this user?')) return;
+            const res = await fetch('/api/admin/reset-quota', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            });
+            if (res.ok) window.location.reload();
+        }
+
+        async function toggleBan(userId) {
+            const res = await fetch('/api/admin/toggle-ban', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            });
+            if (res.ok) window.location.reload();
+        }
+    </script>
+</body>
+</html>
