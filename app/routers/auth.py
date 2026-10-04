@@ -11,31 +11,40 @@ DISCORD_AUTH_URL = "https://discord.com/api/oauth2/authorize"
 DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token"
 DISCORD_USER_URL = "https://discord.com/api/users/@me"
 
+def get_discord_redirect_uri(request: Request) -> str:
+    host = request.headers.get("host")
+    if host:
+        proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+        return f"{proto}://{host}/auth/discord/callback"
+    return settings.DISCORD_REDIRECT_URI
+
 @auth_router.get("/discord/login")
-async def discord_login():
+async def discord_login(request: Request):
     if not settings.DISCORD_CLIENT_ID or not settings.DISCORD_CLIENT_SECRET:
         # If Discord credentials not set yet, redirect to quick dev login
         return RedirectResponse(url="/auth/dev-login")
         
+    redirect_uri = get_discord_redirect_uri(request)
     params = {
         "client_id": settings.DISCORD_CLIENT_ID,
-        "redirect_uri": settings.DISCORD_REDIRECT_URI,
+        "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": "identify email"
     }
     return RedirectResponse(f"{DISCORD_AUTH_URL}?{urlencode(params)}")
 
 @auth_router.get("/discord/callback")
-async def discord_callback(code: str = None, error: str = None):
+async def discord_callback(request: Request, code: str = None, error: str = None):
     if error or not code:
         return RedirectResponse(url="/login?error=discord_denied")
         
+    redirect_uri = get_discord_redirect_uri(request)
     data = {
         "client_id": settings.DISCORD_CLIENT_ID,
         "client_secret": settings.DISCORD_CLIENT_SECRET,
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": settings.DISCORD_REDIRECT_URI
+        "redirect_uri": redirect_uri
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     
