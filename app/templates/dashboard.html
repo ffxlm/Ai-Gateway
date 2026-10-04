@@ -526,11 +526,14 @@
                 </div>
 
                 <!-- QR Code Box (When PromptPay ID is present) -->
-                <div id="qr-box-container" class="bg-white p-3 rounded-xl mx-auto w-fit flex flex-col items-center shadow-md">
+                <div id="qr-box-container" class="bg-white p-3.5 rounded-2xl mx-auto w-fit flex flex-col items-center shadow-lg">
                     <img id="promptpay-qr-img" src="" alt="PromptPay QR Code" class="w-[180px] h-[180px] block object-contain">
-                    <div class="text-[10px] text-zinc-600 font-medium mt-1.5 flex items-center space-x-1.5">
-                        <i class="fa-solid fa-qrcode text-zinc-500"></i>
-                        <span>สแกนด้วย Mobile Banking ทุกธนาคาร</span>
+                    <div class="mt-2 text-center space-y-0.5">
+                        <div class="text-xs font-bold text-zinc-900 leading-tight" id="checkout-promptpay-name">{{ promptpay_name }}</div>
+                        <div class="text-[10px] text-zinc-500 font-medium flex items-center justify-center space-x-1">
+                            <i class="fa-solid fa-qrcode text-zinc-400"></i>
+                            <span>สแกนด้วย Mobile Banking ทุกธนาคาร</span>
+                        </div>
                     </div>
                 </div>
 
@@ -557,22 +560,16 @@
                     <span>กรุณาโอนเงินยอด ฿<span id="checkout-amount-warning">10.00</span> พอดีเพื่อให้ระบบตรวจสลิปผ่าน</span>
                 </div>
 
-                <!-- PromptPay & Account Holder Details -->
-                <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800/80 space-y-2 text-xs">
+                <!-- PromptPay Number & Copy Bar -->
+                <div class="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950 border border-zinc-800/80 text-xs">
                     <div class="truncate">
-                        <span class="text-zinc-400">ชื่อบัญชี:</span>
-                        <span id="checkout-promptpay-name" class="font-medium text-zinc-100 ml-1">{{ promptpay_name }}</span>
+                        <span class="text-zinc-500">พร้อมเพย์:</span>
+                        <span id="checkout-promptpay-id" class="font-mono text-zinc-100 font-semibold select-all ml-1">{{ promptpay_id }}</span>
                     </div>
-                    <div class="flex items-center justify-between pt-2 border-t border-zinc-800/70">
-                        <div class="truncate">
-                            <span class="text-zinc-400">พร้อมเพย์:</span>
-                            <span id="checkout-promptpay-id" class="font-mono text-zinc-200 font-semibold select-all ml-1">{{ promptpay_id }}</span>
-                        </div>
-                        <button type="button" onclick="copyPromptPayId()" class="text-indigo-400 hover:text-indigo-300 font-medium flex items-center space-x-1 text-xs px-2 py-1 rounded bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition shrink-0 ml-2">
-                            <i class="fa-solid fa-copy"></i>
-                            <span id="copy-pp-label">คัดลอก</span>
-                        </button>
-                    </div>
+                    <button type="button" onclick="copyPromptPayId()" class="text-indigo-400 hover:text-indigo-300 font-medium flex items-center space-x-1 text-xs px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition shrink-0 ml-2">
+                        <i class="fa-solid fa-copy"></i>
+                        <span id="copy-pp-label">คัดลอก</span>
+                    </button>
                 </div>
 
                 <!-- Slip Upload / Paste Zone -->
