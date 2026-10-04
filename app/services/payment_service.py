@@ -112,108 +112,105 @@ async def verify_slip_with_slipok(file_bytes: bytes, filename: str, expected_amo
             resp = await client.post(url, headers=headers, files=files, data=data)
             print(f"[SlipOK DEBUG] HTTP Status: {resp.status_code}, Body: {resp.text}")
             
-            if resp.status_code == 200:
+            res_json = {}
+            try:
                 res_json = resp.json()
-                if res_json.get("success"):
-                    inner = res_json.get("data", {})
-                    # Standard SlipOK response structure
-                    if isinstance(inner, dict):
-                        if "data" in inner and isinstance(inner["data"], dict) and ("transRef" in inner["data"] or "trans_ref" in inner["data"]):
-                            slip_data = inner["data"]
-                        else:
-                            slip_data = inner
-                    else:
-                        slip_data = {}
-                        
-                    trans_ref = slip_data.get("transRef") or slip_data.get("trans_ref") or "UNKNOWN_REF"
+            except Exception:
+                pass
+                
+            code = res_json.get("code")
+            inner_data = res_json.get("data")
+            is_valid_slip_payload = (
+                isinstance(inner_data, dict) and 
+                (bool(inner_data.get("transRef")) or bool(inner_data.get("qrcodeData")))
+            )
+            
+            # SlipOK returns 200 on standard match, or 400 with code 1014 when the slip
+            # is verified with the central bank but doesn't match SlipOK's LINE branch primary account.
+            # In either case, if valid slip payload exists, we validate amount and receiver ourselves.
+            if resp.status_code == 200 or (code == 1014 and is_valid_slip_payload):
+                inner = inner_data if isinstance(inner_data, dict) else {}
+                # Standard SlipOK response structure
+                if "data" in inner and isinstance(inner["data"], dict) and ("transRef" in inner["data"] or "trans_ref" in inner["data"]):
+                    slip_data = inner["data"]
+                else:
+                    slip_data = inner
                     
-                    # 1. Amount validation
-                    actual_amount_raw = slip_data.get("amount")
-                    if actual_amount_raw is not None:
-                        try:
-                            actual_amount = float(actual_amount_raw)
-                            if abs(actual_amount - expected_amount) > 0.01:
-                                return {
-                                    "success": False,
-                                    "message": f"ยอดเงินในสลิป (฿{actual_amount:.2f}) ไม่ตรงกับราคาแพ็กเกจ (฿{expected_amount:.2f})"
-                                }
-                        except (ValueError, TypeError):
-                            pass
-                            
-                    # 2. Receiver validation (if receiver info is present in slip)
-                    receiver_info = slip_data.get("receiver")
-                    if receiver_info and isinstance(receiver_info, dict):
-                        rec_str = json.dumps(receiver_info, ensure_ascii=False).lower()
-                        clean_pp = promptpay_id.replace("-", "").replace(" ", "").strip()
-                        clean_name = promptpay_name.strip()
-                        
-                        matched = False
-                        # Match PromptPay last 4 digits (e.g. 0470)
-                        if len(clean_pp) >= 4 and clean_pp[-4:] in rec_str:
-                            matched = True
-                        if clean_pp and clean_pp in rec_str:
-                            matched = True
-                            
-                        # Match words from promptpay_name
-                        if not matched and clean_name:
-                            name_words = [w.strip().lower() for w in clean_name.split() if len(w.strip()) >= 3]
-                            for word in name_words:
-                                if word in rec_str:
-                                    matched = True
-                                    break
-                                    
-                        # Match transliterations or Thai name
-                        if not matched and "ธีรภัทร" in clean_name:
-                            for nick in ["ธีรภัทร", "theeraphat", "theerapat", "teerapat", "teeraphat"]:
-                                if nick in rec_str:
-                                    matched = True
-                                    break
-                                    
-                        if not matched:
-                            disp = receiver_info.get("displayName") or receiver_info.get("name") or "ไม่ทราบชื่อ"
+                trans_ref = slip_data.get("transRef") or slip_data.get("trans_ref") or "UNKNOWN_REF"
+                
+                # 1. Amount validation
+                actual_amount_raw = slip_data.get("amount")
+                if actual_amount_raw is not None:
+                    try:
+                        actual_amount = float(actual_amount_raw)
+                        if abs(actual_amount - expected_amount) > 0.01:
                             return {
                                 "success": False,
-                                "message": f"สลิปนี้ไม่ได้โอนเข้าบัญชีผู้รับของระบบ (ชื่อผู้รับในสลิป: {disp})"
+                                "message": f"ยอดเงินในสลิป (฿{actual_amount:.2f}) ไม่ตรงกับราคาแพ็กเกจ (฿{expected_amount:.2f})"
                             }
-                            
-                    return {
-                        "success": True,
-                        "trans_ref": trans_ref,
-                        "data": slip_data,
-                        "raw": res_json
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": res_json.get("message", "การตรวจสอบสลิปไม่สำเร็จ")
-                    }
-            else:
-                try:
-                    err_json = resp.json()
-                    code = err_json.get("code")
-                    msg = err_json.get("message", "")
-                    
-                    if code == 1012:
-                        user_msg = "สลิปนี้ถูกใช้งานไปแล้ว ไม่สามารถใช้ซ้ำได้"
-                    elif code == 1013:
-                        user_msg = f"ยอดเงินในสลิปไม่ตรงกับราคาแพ็กเกจ (ต้องเป็น ฿{expected_amount:.2f})"
-                    elif code == 1014:
-                        user_msg = "สลิปนี้ไม่ได้โอนเข้าบัญชีผู้รับของระบบ"
-                    elif code in (1000, 1007):
-                        user_msg = "ไม่พบ QR Code ในสลิป หรือรูปภาพไม่ชัดเจน กรุณาแนบสลิปธนาคารที่มี QR Code ชัดเจน"
-                    elif code == 1005:
-                        user_msg = "ไฟล์ไม่ใช่ไฟล์รูปภาพ กรุณาอัปโหลดไฟล์สลิป .jpg, .png หรือ .webp"
-                    elif code == 1010:
-                        user_msg = "ธนาคารต้นทางกำลังประมวลผล กรุณารอประมาณ 3-5 นาทีแล้วลองใหม่อีกครั้ง"
-                    else:
-                        user_msg = msg or f"เกิดข้อผิดพลาดในการตรวจสอบสลิป (Code: {code})"
+                    except (ValueError, TypeError):
+                        pass
                         
-                    return {"success": False, "message": user_msg, "code": code}
-                except Exception:
-                    return {
-                        "success": False,
-                        "message": f"เซิร์ฟเวอร์ตรวจสอบสลิปตอบกลับผิดพลาด (HTTP {resp.status_code})"
-                    }
+                # 2. Receiver validation (if receiver info is present in slip)
+                receiver_info = slip_data.get("receiver")
+                if receiver_info and isinstance(receiver_info, dict):
+                    rec_str = json.dumps(receiver_info, ensure_ascii=False).lower()
+                    clean_pp = promptpay_id.replace("-", "").replace(" ", "").strip()
+                    clean_name = promptpay_name.strip()
+                    
+                    matched = False
+                    # Match PromptPay last 4 digits (e.g. 0470)
+                    if len(clean_pp) >= 4 and clean_pp[-4:] in rec_str:
+                        matched = True
+                    if clean_pp and clean_pp in rec_str:
+                        matched = True
+                        
+                    # Match words from promptpay_name
+                    if not matched and clean_name:
+                        name_words = [w.strip().lower() for w in clean_name.split() if len(w.strip()) >= 3]
+                        for word in name_words:
+                            if word in rec_str:
+                                matched = True
+                                break
+                                
+                    # Match transliterations or Thai name (Thiraphat, Theeraphat, Teerapat, etc.)
+                    if not matched and "ธีรภัทร" in clean_name:
+                        for nick in ["ธีรภัทร", "thiraphat", "theeraphat", "theerapat", "teerapat", "teeraphat"]:
+                            if nick in rec_str:
+                                matched = True
+                                break
+                                
+                    if not matched:
+                        disp = receiver_info.get("displayName") or receiver_info.get("name") or "ไม่ทราบชื่อ"
+                        return {
+                            "success": False,
+                            "message": f"สลิปนี้ไม่ได้โอนเข้าบัญชีผู้รับของระบบ (ชื่อผู้รับในสลิป: {disp})"
+                        }
+                        
+                return {
+                    "success": True,
+                    "trans_ref": trans_ref,
+                    "data": slip_data,
+                    "raw": res_json
+                }
+            else:
+                msg = res_json.get("message", "")
+                if code == 1012:
+                    user_msg = "สลิปนี้ถูกใช้งานไปแล้ว ไม่สามารถใช้ซ้ำได้"
+                elif code == 1013:
+                    user_msg = f"ยอดเงินในสลิปไม่ตรงกับราคาแพ็กเกจ (ต้องเป็น ฿{expected_amount:.2f})"
+                elif code == 1014:
+                    user_msg = "สลิปนี้ไม่ได้โอนเข้าบัญชีผู้รับของระบบ"
+                elif code in (1000, 1007):
+                    user_msg = "ไม่พบ QR Code ในสลิป หรือรูปภาพไม่ชัดเจน กรุณาแนบสลิปธนาคารที่มี QR Code ชัดเจน"
+                elif code == 1005:
+                    user_msg = "ไฟล์ไม่ใช่ไฟล์รูปภาพ กรุณาอัปโหลดไฟล์สลิป .jpg, .png หรือ .webp"
+                elif code == 1010:
+                    user_msg = "ธนาคารต้นทางกำลังประมวลผล กรุณารอประมาณ 3-5 นาทีแล้วลองใหม่อีกครั้ง"
+                else:
+                    user_msg = msg or f"เกิดข้อผิดพลาดในการตรวจสอบสลิป (Code: {code})"
+                    
+                return {"success": False, "message": user_msg, "code": code}
         except httpx.TimeoutException:
             return {
                 "success": False,
