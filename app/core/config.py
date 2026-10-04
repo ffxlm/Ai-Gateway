@@ -31,5 +31,12 @@ class Settings:
     ADMIN_SECRET: str = os.getenv("ADMIN_SECRET", "admin-pass-2026")
     ADMIN_DISCORD_IDS: str = os.getenv("ADMIN_DISCORD_IDS", "1519726876984086528")
     DISCORD_INVITE_URL: str = os.getenv("DISCORD_INVITE_URL", "https://discord.gg/N7Kuayuzxb")
+    VIP_DAILY_PRICE: int = int(os.getenv("VIP_DAILY_PRICE", "10"))
+    VIP_WEEKLY_PRICE: int = int(os.getenv("VIP_WEEKLY_PRICE", "50"))
+
+    # Payment & SlipOK
+    PROMPTPAY_ID: str = os.getenv("PROMPTPAY_ID", "")
+    SLIPOK_BRANCH_ID: str = os.getenv("SLIPOK_BRANCH_ID", "77682")
+    SLIPOK_API_KEY: str = os.getenv("SLIPOK_API_KEY", "SLIPOK4JOF2LJ")
 
 settings = Settings()

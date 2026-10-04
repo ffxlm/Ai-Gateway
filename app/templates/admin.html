@@ -122,6 +122,21 @@
                     <input type="number" name="vip_weekly_price" value="{{ settings.vip_weekly_price }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
                 </div>
 
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">PromptPay ID (เบอร์โทร/เลขบัตร ปชช สำหรับ QR)</label>
+                    <input type="text" name="promptpay_id" value="{{ settings.promptpay_id }}" placeholder="08xxxxxxxx หรือเลข 13 หลัก" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">SlipOK Branch ID</label>
+                    <input type="text" name="slipok_branch_id" value="{{ settings.slipok_branch_id }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1 md:col-span-2">
+                    <label class="text-xs font-medium text-zinc-400">SlipOK API Key</label>
+                    <input type="password" name="slipok_api_key" value="{{ settings.slipok_api_key }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
                 <div class="md:col-span-2 pt-2">
                     <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-semibold transition">
                         Save System Settings
@@ -199,6 +214,55 @@
                                 </button>
                                 <button onclick="deleteUser('{{ u.id }}', '{{ u.username }}')" class="px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 text-rose-400 hover:text-rose-200 border border-rose-800 text-[11px] transition" title="Delete User"><i class="fa-solid fa-trash"></i></button>
                             </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section: Recent Payment Transactions -->
+        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+            <div class="flex items-center justify-between border-b border-zinc-800/80 pb-4">
+                <div>
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
+                        <i class="fa-solid fa-receipt text-emerald-400"></i>
+                        <span>Recent VIP Payments (SlipOK)</span>
+                    </h2>
+                    <p class="text-xs text-zinc-400 mt-1">Transaction history and verified bank slips.</p>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="border-b border-zinc-800 text-[11px] text-zinc-400 uppercase tracking-wider font-semibold">
+                            <th class="py-2.5 px-3">User</th>
+                            <th class="py-2.5 px-3">Pass Type</th>
+                            <th class="py-2.5 px-3">Amount</th>
+                            <th class="py-2.5 px-3">Bank Ref (transRef)</th>
+                            <th class="py-2.5 px-3">Time</th>
+                            <th class="py-2.5 px-3">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-800/60 text-zinc-300">
+                        {% for p in payments %}
+                        <tr class="hover:bg-zinc-850/30 transition">
+                            <td class="py-2.5 px-3 flex items-center space-x-2">
+                                <img src="{{ p.avatar_url or 'https://cdn.discordapp.com/embed/avatars/0.png' }}" class="w-5 h-5 rounded-full">
+                                <span class="font-medium text-zinc-200">{{ p.username or p.user_id }}</span>
+                            </td>
+                            <td class="py-2.5 px-3 uppercase text-[11px] font-semibold text-violet-400">{{ p.pass_type }} Pass</td>
+                            <td class="py-2.5 px-3 font-mono font-bold text-emerald-400">฿{{ "{:,.2f}".format(p.amount) }}</td>
+                            <td class="py-2.5 px-3 font-mono text-[11px] text-zinc-400">{{ p.trans_ref }}</td>
+                            <td class="py-2.5 px-3 text-zinc-500 font-mono text-[11px]">{{ p.created_at }}</td>
+                            <td class="py-2.5 px-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/60 border border-emerald-800 text-emerald-400">Verified</span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="py-6 text-center text-zinc-500">No payment transactions recorded yet.</td>
                         </tr>
                         {% endfor %}
                     </tbody>

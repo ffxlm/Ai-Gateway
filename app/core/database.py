@@ -67,6 +67,19 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now', 'localtime'))
         );
         """)
+
+        # 4. Payment Transactions
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS payment_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            pass_type TEXT NOT NULL,
+            amount REAL NOT NULL,
+            trans_ref TEXT UNIQUE NOT NULL,
+            payment_method TEXT DEFAULT 'slipok',
+            created_at TEXT DEFAULT (datetime('now', 'localtime'))
+        );
+        """)
         
         # Seed default settings if not exists
         default_settings = {
@@ -74,8 +87,11 @@ def init_db():
             "master_router_url": settings.MASTER_ROUTER_URL,
             "master_router_key": settings.MASTER_ROUTER_KEY,
             "discord_invite_url": settings.DISCORD_INVITE_URL,
-            "vip_daily_price": "10",
-            "vip_weekly_price": "50"
+            "vip_daily_price": str(settings.VIP_DAILY_PRICE),
+            "vip_weekly_price": str(settings.VIP_WEEKLY_PRICE),
+            "promptpay_id": settings.PROMPTPAY_ID,
+            "slipok_branch_id": settings.SLIPOK_BRANCH_ID,
+            "slipok_api_key": settings.SLIPOK_API_KEY
         }
         for k, v in default_settings.items():
             cursor.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?);", (k, v))

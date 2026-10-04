@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- QRCode.js -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -75,9 +77,9 @@
                 {% else %}
                 <!-- Regular User: Upgrade Button -->
                 <div class="inline-flex items-center space-x-1.5">
-                    <button onclick="openVipModal()" class="px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-medium rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 hover:border-violet-500/50 transition flex items-center space-x-1.5 shadow-xs group whitespace-nowrap" title="Upgrade VIP Membership">
+                    <button onclick="openVipModal()" class="px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-medium rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 hover:border-violet-500/50 transition flex items-center space-x-1.5 shadow-xs group whitespace-nowrap" title="{% if is_vip %}ต่ออายุ VIP Membership{% else %}Upgrade VIP Membership{% endif %}">
                         <i class="fa-solid fa-crown text-violet-400 group-hover:scale-110 transition-transform text-xs"></i>
-                        <span>Upgrade</span>
+                        <span>{% if is_vip %}Extend VIP{% else %}Upgrade{% endif %}</span>
                     </button>
                     {% if is_admin %}
                     <a href="/?view=admin" class="px-2 sm:px-2.5 py-1 sm:py-1.5 text-xs font-medium rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition flex items-center space-x-1 whitespace-nowrap shadow-xs" title="Switch back to Admin View">
@@ -193,9 +195,12 @@
                 <div id="vip-expiry-countdown" class="text-base sm:text-2xl font-bold tracking-tight text-rose-300 font-mono">
                     --:--:--
                 </div>
-                <div class="text-[10px] sm:text-xs text-rose-400/80 truncate flex items-center space-x-1">
-                    <i class="fa-solid fa-calendar-check text-[9px]"></i>
-                    <span>Until: {{ user.vip_expires_at[:16].replace('T', ' ') if user.vip_expires_at else 'Active' }}</span>
+                <div class="text-[10px] sm:text-xs text-rose-400/80 truncate flex items-center justify-between">
+                    <span class="flex items-center space-x-1 truncate">
+                        <i class="fa-solid fa-calendar-check text-[9px]"></i>
+                        <span>Until: {{ user.vip_expires_at[:16].replace('T', ' ') if user.vip_expires_at else 'Active' }}</span>
+                    </span>
+                    <button type="button" onclick="openVipModal()" class="text-[10px] text-rose-300 hover:text-white underline font-medium ml-1.5 cursor-pointer shrink-0">ต่ออายุ</button>
                 </div>
             </div>
             {% else %}
@@ -413,77 +418,201 @@
     </footer>
 
     <!-- Contact Admin / VIP Modal -->
-    <div id="vip-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-zinc-900 border border-zinc-800 max-w-md w-full rounded-xl p-5 sm:p-6 space-y-4 shadow-2xl">
-            <!-- Modal Header -->
-            <div class="flex items-center justify-between border-b border-zinc-800/80 pb-3">
-                <div class="flex items-center space-x-2">
-                    <i class="fa-solid fa-crown text-violet-400 text-base"></i>
-                    <h3 class="text-sm font-semibold text-zinc-100">Upgrade to Unlimited VIP</h3>
+    <div id="vip-modal" onclick="if(event.target === this) closeVipModal()" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+        <div class="bg-zinc-900 border border-zinc-800 max-w-md w-full rounded-2xl p-5 sm:p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            
+            <!-- STEP 1: Plan Selection View -->
+            <div id="vip-view-select" class="space-y-4">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between border-b border-zinc-800/80 pb-3">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-crown text-amber-400 text-base"></i>
+                        <h3 class="text-sm font-semibold text-zinc-100">{% if is_vip %}ต่ออายุ Unlimited VIP{% else %}อัปเกรดเป็น Unlimited VIP{% endif %}</h3>
+                    </div>
+                    <button type="button" onclick="closeVipModal()" class="text-zinc-500 hover:text-zinc-300 text-sm p-1 rounded-md transition">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
                 </div>
-                <button onclick="closeVipModal()" class="text-zinc-500 hover:text-zinc-300 text-sm p-1">
-                    <i class="fa-solid fa-xmark"></i>
+
+                <p class="text-xs text-zinc-400">เลือกแพ็กเกจ VIP เพื่อปลดล็อกโควตา Token ไม่จำกัด และสิทธิ์ Priority Routing อัตโนมัติทันที</p>
+
+                <!-- Stacked Passes (Daily / Weekly) -->
+                <div class="space-y-3">
+                    <!-- Daily Pass -->
+                    <div class="p-3.5 sm:p-4 rounded-xl bg-zinc-950 border border-zinc-800/80 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Daily Pass</span>
+                            <span class="text-base font-bold font-mono text-zinc-100">฿{{ vip_daily_price }} <span class="text-xs text-zinc-500 font-normal font-sans">/ 24 ชม.</span></span>
+                        </div>
+                        <ul class="text-xs space-y-1 text-zinc-400">
+                            <li class="flex items-center space-x-2">
+                                <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
+                                <span>โควตา Token ไม่จำกัด 100%</span>
+                            </li>
+                            <li class="flex items-center space-x-2">
+                                <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
+                                <span>คิวประมวลผลด่วนพิเศษ (Priority Routing)</span>
+                            </li>
+                            <li class="flex items-center space-x-2">
+                                <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
+                                <span>รองรับการใช้งานทุกโมเดลตลอด 24 ชม.</span>
+                            </li>
+                        </ul>
+                        <button type="button" onclick="startVipCheckout('daily')" class="w-full mt-2 py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium rounded-lg transition flex items-center justify-center space-x-1.5 border border-zinc-700/60 shadow-xs">
+                            <i class="fa-solid fa-qrcode text-indigo-400 text-xs"></i>
+                            <span>เลือก Daily Pass (฿{{ vip_daily_price }})</span>
+                        </button>
+                    </div>
+
+                    <!-- Weekly Pass -->
+                    <div class="p-3.5 sm:p-4 rounded-xl bg-zinc-950 border border-indigo-900/60 relative space-y-2">
+                        <div class="absolute -top-2.5 right-3 bg-indigo-600 text-white text-[9px] font-semibold uppercase px-2 py-0.5 rounded tracking-wider shadow-xs">Best Value</div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Weekly Pass</span>
+                            <span class="text-base font-bold font-mono text-zinc-100">฿{{ vip_weekly_price }} <span class="text-xs text-zinc-500 font-normal font-sans">/ 7 วัน</span></span>
+                        </div>
+                        <ul class="text-xs space-y-1 text-zinc-400">
+                            <li class="flex items-center space-x-2">
+                                <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
+                                <span>โควตา Token ไม่จำกัด 100% ยาวนาน 7 วัน</span>
+                            </li>
+                            <li class="flex items-center space-x-2">
+                                <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
+                                <span>คิวประมวลผลด่วนพิเศษ (Priority Fast-Track)</span>
+                            </li>
+                            <li class="flex items-center space-x-2">
+                                <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
+                                <span>ประหยัดทันที ฿20 (คุ้มค่ายาวนาน 7 วันเต็ม)</span>
+                            </li>
+                        </ul>
+                        <button type="button" onclick="startVipCheckout('weekly')" class="w-full mt-2 py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition flex items-center justify-center space-x-1.5 shadow-sm">
+                            <i class="fa-solid fa-qrcode text-xs"></i>
+                            <span>เลือก Weekly Pass (฿{{ vip_weekly_price }})</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Secondary Support & Discord Link -->
+                <div class="pt-2 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-400">
+                    <span>ต้องการความช่วยเหลือ?</span>
+                    <a href="{{ discord_invite }}" target="_blank" rel="noopener noreferrer" class="text-indigo-400 hover:text-indigo-300 font-medium flex items-center space-x-1">
+                        <i class="fa-brands fa-discord"></i>
+                        <span>ติดต่อแอดมินบน Discord</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- STEP 2: Checkout & Slip Upload View -->
+            <div id="vip-view-checkout" class="space-y-3.5 hidden">
+                <!-- Modal Header with Back Button -->
+                <div class="flex items-center justify-between border-b border-zinc-800/80 pb-3">
+                    <button type="button" onclick="backToVipSelect()" class="text-zinc-400 hover:text-zinc-200 text-xs flex items-center space-x-1.5 p-1 rounded-md transition">
+                        <i class="fa-solid fa-arrow-left text-xs"></i>
+                        <span>เปลี่ยนแพ็กเกจ</span>
+                    </button>
+                    <h3 class="text-xs font-semibold text-zinc-200">ชำระเงินผ่าน PromptPay</h3>
+                    <button type="button" onclick="closeVipModal()" class="text-zinc-500 hover:text-zinc-300 text-sm p-1 rounded-md transition">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- Order Summary Pill -->
+                <div class="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800/80">
+                    <div>
+                        <div class="text-[11px] text-zinc-500 uppercase tracking-wider">แพ็กเกจที่เลือก</div>
+                        <div id="checkout-plan-name" class="text-xs font-semibold text-zinc-200">Daily Pass (24 ชั่วโมง)</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-[11px] text-zinc-500 uppercase tracking-wider">ยอดที่ต้องชำระ</div>
+                        <div class="text-base font-bold font-mono text-emerald-400">฿<span id="checkout-amount-display">10.00</span></div>
+                    </div>
+                </div>
+
+                <!-- QR Code Box -->
+                <div class="bg-white p-3 rounded-xl mx-auto w-fit flex flex-col items-center shadow-md">
+                    <canvas id="promptpay-qr-canvas" class="w-[180px] h-[180px] block"></canvas>
+                    <div class="text-[10px] text-zinc-600 font-medium mt-1.5 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-qrcode text-zinc-500"></i>
+                        <span>สแกนด้วย Mobile Banking ทุกธนาคาร</span>
+                    </div>
+                </div>
+
+                <!-- Exact Amount Notice -->
+                <div class="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-800/50 rounded-lg px-2.5 py-1.5 text-center flex items-center justify-center space-x-1.5">
+                    <i class="fa-solid fa-triangle-exclamation shrink-0 text-xs text-amber-400"></i>
+                    <span>กรุณาโอนเงินยอด ฿<span id="checkout-amount-warning">10.00</span> พอดีเพื่อให้ระบบตรวจสลิปผ่าน</span>
+                </div>
+
+                <!-- PromptPay ID Copy Box -->
+                <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs">
+                    <div class="truncate">
+                        <span class="text-zinc-500">พร้อมเพย์:</span>
+                        <span id="checkout-promptpay-id" class="font-mono text-zinc-200 font-semibold select-all ml-1">{{ promptpay_id }}</span>
+                    </div>
+                    <button type="button" onclick="copyPromptPayId()" class="text-indigo-400 hover:text-indigo-300 font-medium flex items-center space-x-1 text-xs px-2 py-1 rounded bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition shrink-0 ml-2">
+                        <i class="fa-solid fa-copy"></i>
+                        <span id="copy-pp-label">คัดลอก</span>
+                    </button>
+                </div>
+
+                <!-- Slip Upload / Paste Zone -->
+                <div class="space-y-1.5">
+                    <label class="text-xs font-medium text-zinc-300 flex items-center justify-between">
+                        <span>แนบสลิปการโอนเงิน</span>
+                        <span class="text-[10px] text-zinc-500 font-normal">ตรวจสลิปอัตโนมัติ 24 ชม.</span>
+                    </label>
+
+                    <!-- Dropzone -->
+                    <div id="slip-dropzone" onclick="document.getElementById('slip-file-input').click()" class="border-2 border-dashed border-zinc-700 hover:border-indigo-500 rounded-xl p-3.5 text-center cursor-pointer transition bg-zinc-950/50 hover:bg-zinc-950 group">
+                        <i class="fa-solid fa-cloud-arrow-up text-xl text-zinc-400 group-hover:text-indigo-400 mb-1 transition-colors"></i>
+                        <p class="text-xs text-zinc-300 font-medium">คลิกเพื่อเลือกไฟล์ หรือกด <kbd class="px-1.5 py-0.5 bg-zinc-800 text-[10px] rounded border border-zinc-700 text-zinc-200 font-mono">Ctrl+V</kbd> เพื่อวางรูป</p>
+                        <p class="text-[10px] text-zinc-500 mt-0.5">รองรับไฟล์สลิปรูปภาพ JPG, PNG (สูงสุด 10MB)</p>
+                    </div>
+                    <input type="file" id="slip-file-input" accept="image/*" class="hidden" onchange="handleSlipFileSelected(this)">
+
+                    <!-- Slip Preview Box -->
+                    <div id="slip-preview-container" class="hidden flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800">
+                        <div class="flex items-center space-x-3 overflow-hidden">
+                            <img id="slip-preview-img" src="" alt="Slip Preview" class="w-10 h-10 object-cover rounded border border-zinc-700 shrink-0">
+                            <div class="truncate text-xs">
+                                <p id="slip-preview-name" class="font-medium text-zinc-200 truncate">slip.png</p>
+                                <p id="slip-preview-size" class="text-[11px] text-zinc-500 font-mono">120 KB</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="removeSelectedSlip()" class="text-zinc-500 hover:text-rose-400 p-1.5 transition rounded hover:bg-zinc-900" title="ลบรูปนี้">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Error Banner -->
+                <div id="checkout-error-banner" class="hidden p-3 rounded-lg bg-rose-950/70 border border-rose-800/80 text-rose-300 text-xs flex items-start space-x-2">
+                    <i class="fa-solid fa-circle-exclamation mt-0.5 shrink-0 text-rose-400"></i>
+                    <span id="checkout-error-text">ข้อผิดพลาดในการตรวจสอบสลิป</span>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="button" id="btn-submit-slip" onclick="submitSlipPayment()" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-xs rounded-lg transition flex items-center justify-center space-x-2 shadow-sm">
+                    <i id="btn-submit-icon" class="fa-solid fa-shield-halved"></i>
+                    <span id="btn-submit-text">ยืนยันและตรวจสอบสลิปอัตโนมัติ</span>
                 </button>
             </div>
 
-            <!-- Stacked Passes (บน/ล่าง รายวัน/สัปดาห์) -->
-            <div class="space-y-3">
-                <!-- Daily Pass (บน) -->
-                <div class="p-3.5 sm:p-4 rounded-lg bg-zinc-950 border border-zinc-800/80 space-y-1.5">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Daily Pass</span>
-                        <span class="text-base font-bold font-mono text-zinc-100">฿{{ vip_daily_price }} <span class="text-xs text-zinc-500 font-normal font-sans">/ 24 hrs</span></span>
-                    </div>
-                    <ul class="text-xs space-y-1 text-zinc-400">
-                        <li class="flex items-center space-x-2">
-                            <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                            <span>โควตา Token ไม่จำกัด 100%</span>
-                        </li>
-                        <li class="flex items-center space-x-2">
-                            <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                            <span>คิวประมวลผลด่วนพิเศษ (Priority Routing)</span>
-                        </li>
-                        <li class="flex items-center space-x-2">
-                            <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                            <span>รองรับการใช้งานทุกโมเดลตลอด 24 ชม.</span>
-                        </li>
-                    </ul>
+            <!-- STEP 3: Success View -->
+            <div id="vip-view-success" class="space-y-4 py-4 text-center hidden">
+                <div class="w-16 h-16 rounded-full bg-emerald-950/70 border border-emerald-800/80 flex items-center justify-center mx-auto text-emerald-400 text-2xl shadow-lg">
+                    <i class="fa-solid fa-check"></i>
                 </div>
-
-                <!-- Weekly Pass (ล่าง) -->
-                <div class="p-3.5 sm:p-4 rounded-lg bg-zinc-950 border border-indigo-900/50 relative space-y-1.5">
-                    <div class="absolute -top-2.5 right-3 bg-indigo-600 text-white text-[9px] font-semibold uppercase px-2 py-0.5 rounded tracking-wider shadow-xs">Best Value</div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Weekly Pass</span>
-                        <span class="text-base font-bold font-mono text-zinc-100">฿{{ vip_weekly_price }} <span class="text-xs text-zinc-500 font-normal font-sans">/ 7 days</span></span>
-                    </div>
-                    <ul class="text-xs space-y-1 text-zinc-400">
-                        <li class="flex items-center space-x-2">
-                            <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                            <span>โควตา Token ไม่จำกัด 100%</span>
-                        </li>
-                        <li class="flex items-center space-x-2">
-                            <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                            <span>คิวประมวลผลด่วนพิเศษ (Priority Fast-Track)</span>
-                        </li>
-                        <li class="flex items-center space-x-2">
-                            <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                            <span>ประหยัดทันที ฿20 (คุ้มค่ายาวนาน 7 วันเต็ม)</span>
-                        </li>
-                    </ul>
+                <div class="space-y-1">
+                    <h3 class="text-base font-bold text-zinc-100">อัปเกรด VIP สำเร็จเรียบร้อย!</h3>
+                    <p id="success-message-text" class="text-xs text-zinc-400">บัญชีของคุณได้รับการอัปเกรดเป็น Unlimited VIP เรียบร้อยแล้ว</p>
                 </div>
-            </div>
-
-            <!-- Action Buttons: Directly to Discord, no copying -->
-            <div class="space-y-2 pt-1">
-                <a href="{{ discord_invite }}" target="_blank" rel="noopener noreferrer" class="w-full py-2.5 px-4 bg-[#5865F2] hover:bg-[#4752c4] text-white font-medium text-xs rounded-lg transition flex items-center justify-center space-x-2 shadow-sm">
-                    <i class="fa-brands fa-discord text-sm"></i>
-                    <span>ติดต่อแอดมินบน Discord</span>
-                </a>
-                <button onclick="closeVipModal()" class="w-full py-2 px-4 border border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs rounded-lg transition">
-                    Close
+                <button type="button" onclick="window.location.reload()" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs rounded-lg transition flex items-center justify-center space-x-2 shadow-sm">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>เริ่มใช้งานทันที (รีโหลดหน้าเว็บ)</span>
                 </button>
             </div>
+            
         </div>
     </div>
 
@@ -795,13 +924,280 @@
             renderUsageChart(activeAnalyticsData);
         });
 
-        // VIP Modal Controls
+        // VIP Modal & SlipOK Payment Controls
+        let currentPassType = 'daily';
+        let currentSlipFile = null;
+
         function openVipModal() {
+            backToVipSelect();
             document.getElementById('vip-modal').classList.remove('hidden');
         }
+
         function closeVipModal() {
             document.getElementById('vip-modal').classList.add('hidden');
+            removeSelectedSlip();
+            hideCheckoutError();
         }
+
+        function backToVipSelect() {
+            const selectView = document.getElementById('vip-view-select');
+            const checkoutView = document.getElementById('vip-view-checkout');
+            const successView = document.getElementById('vip-view-success');
+            if (selectView) selectView.classList.remove('hidden');
+            if (checkoutView) checkoutView.classList.add('hidden');
+            if (successView) successView.classList.add('hidden');
+            hideCheckoutError();
+        }
+
+        async function startVipCheckout(passType) {
+            currentPassType = passType;
+            hideCheckoutError();
+            removeSelectedSlip();
+
+            try {
+                const res = await fetch(`/api/payment/promptpay-info?pass_type=${passType}`);
+                const data = await res.json();
+                if (data.status !== 'ok') {
+                    alert('เกิดข้อผิดพลาดในการโหลดข้อมูลพร้อมเพย์');
+                    return;
+                }
+
+                // Update summary texts
+                const planNameEl = document.getElementById('checkout-plan-name');
+                if (planNameEl) planNameEl.textContent = data.title;
+
+                const formattedAmt = Number(data.amount).toFixed(2);
+                const amtDisplayEl = document.getElementById('checkout-amount-display');
+                if (amtDisplayEl) amtDisplayEl.textContent = formattedAmt;
+
+                const amtWarningEl = document.getElementById('checkout-amount-warning');
+                if (amtWarningEl) amtWarningEl.textContent = formattedAmt;
+
+                if (data.promptpay_id) {
+                    const ppEl = document.getElementById('checkout-promptpay-id');
+                    if (ppEl) ppEl.textContent = data.promptpay_id;
+                }
+
+                // Render QR code
+                const canvas = document.getElementById('promptpay-qr-canvas');
+                if (canvas && window.QRCode) {
+                    if (data.qr_payload) {
+                        canvas.style.display = 'block';
+                        QRCode.toCanvas(canvas, data.qr_payload, {
+                            width: 180,
+                            margin: 1,
+                            color: {
+                                dark: '#000000',
+                                light: '#ffffff'
+                            }
+                        }, function (error) {
+                            if (error) console.error('QR Render Error:', error);
+                        });
+                    } else {
+                        canvas.style.display = 'none';
+                        showCheckoutError('ยังไม่ได้กำหนดหมายเลขพร้อมเพย์ในระบบ กรุณาติดต่อแอดมินหรือระบุในหน้า Admin');
+                    }
+                }
+
+                // Switch views
+                document.getElementById('vip-view-select').classList.add('hidden');
+                document.getElementById('vip-view-checkout').classList.remove('hidden');
+                document.getElementById('vip-view-success').classList.add('hidden');
+            } catch (err) {
+                console.error('Failed to load PromptPay QR:', err);
+                alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้ง');
+            }
+        }
+
+        function copyPromptPayId() {
+            const ppEl = document.getElementById('checkout-promptpay-id');
+            const ppId = ppEl ? ppEl.textContent.trim() : '';
+            if (!ppId) return;
+            navigator.clipboard.writeText(ppId).then(() => {
+                const label = document.getElementById('copy-pp-label');
+                if (label) {
+                    const oldText = label.textContent;
+                    label.textContent = 'คัดลอกแล้ว!';
+                    setTimeout(() => { label.textContent = oldText; }, 1800);
+                }
+            }).catch(() => {
+                alert('คัดลอกไม่สำเร็จ: ' + ppId);
+            });
+        }
+
+        function setSlipFile(file) {
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                showCheckoutError('กรุณาเลือกไฟล์รูปภาพเท่านั้น (JPG, PNG)');
+                return;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+                showCheckoutError('ขนาดไฟล์รูปภาพสลิปใหญ่เกิน 10MB');
+                return;
+            }
+
+            currentSlipFile = file;
+            hideCheckoutError();
+
+            // Preview image
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const previewImg = document.getElementById('slip-preview-img');
+                if (previewImg) previewImg.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+
+            // Preview info
+            const nameEl = document.getElementById('slip-preview-name');
+            const sizeEl = document.getElementById('slip-preview-size');
+            if (nameEl) nameEl.textContent = file.name;
+            if (sizeEl) {
+                const sizeKb = (file.size / 1024).toFixed(1);
+                sizeEl.textContent = `${sizeKb} KB`;
+            }
+
+            document.getElementById('slip-dropzone').classList.add('hidden');
+            document.getElementById('slip-preview-container').classList.remove('hidden');
+        }
+
+        function handleSlipFileSelected(input) {
+            if (input.files && input.files[0]) {
+                setSlipFile(input.files[0]);
+            }
+        }
+
+        function removeSelectedSlip() {
+            currentSlipFile = null;
+            const input = document.getElementById('slip-file-input');
+            if (input) input.value = '';
+            const previewContainer = document.getElementById('slip-preview-container');
+            const dropzone = document.getElementById('slip-dropzone');
+            if (previewContainer) previewContainer.classList.add('hidden');
+            if (dropzone) dropzone.classList.remove('hidden');
+        }
+
+        function showCheckoutError(msg) {
+            const banner = document.getElementById('checkout-error-banner');
+            const textEl = document.getElementById('checkout-error-text');
+            if (banner && textEl) {
+                textEl.textContent = msg;
+                banner.classList.remove('hidden');
+            }
+        }
+
+        function hideCheckoutError() {
+            const banner = document.getElementById('checkout-error-banner');
+            if (banner) banner.classList.add('hidden');
+        }
+
+        async function submitSlipPayment() {
+            if (!currentSlipFile) {
+                showCheckoutError('กรุณาเลือกไฟล์หรือวางรูปภาพสลิปก่อนดำเนินการต่อ');
+                return;
+            }
+
+            hideCheckoutError();
+            const btn = document.getElementById('btn-submit-slip');
+            const icon = document.getElementById('btn-submit-icon');
+            const text = document.getElementById('btn-submit-text');
+
+            // Set loading state
+            btn.disabled = true;
+            if (icon) icon.className = 'fa-solid fa-spinner fa-spin';
+            if (text) text.textContent = 'กำลังตรวจสอบสลิปกับระบบ SlipOK...';
+
+            const formData = new FormData();
+            formData.append('pass_type', currentPassType);
+            formData.append('slip', currentSlipFile);
+
+            try {
+                const res = await fetch('/api/payment/verify-slip', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (!res.ok || data.status !== 'ok') {
+                    throw new Error(data.message || 'การตรวจสอบสลิปไม่สำเร็จ');
+                }
+
+                // Show success view
+                document.getElementById('vip-view-checkout').classList.add('hidden');
+                document.getElementById('vip-view-success').classList.remove('hidden');
+                const succText = document.getElementById('success-message-text');
+                if (succText && data.message) succText.textContent = data.message;
+
+                // Auto reload after 2.5 seconds
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2500);
+
+            } catch (err) {
+                showCheckoutError(err.message || 'เกิดข้อผิดพลาดในการตรวจสอบสลิป');
+            } finally {
+                btn.disabled = false;
+                if (icon) icon.className = 'fa-solid fa-shield-halved';
+                if (text) text.textContent = 'ยืนยันและตรวจสอบสลิปอัตโนมัติ';
+            }
+        }
+
+        // Global Paste Listener (Ctrl+V) for slip uploads
+        window.addEventListener('paste', (e) => {
+            const modal = document.getElementById('vip-modal');
+            const checkoutView = document.getElementById('vip-view-checkout');
+            if (!modal || modal.classList.contains('hidden') || !checkoutView || checkoutView.classList.contains('hidden')) {
+                return;
+            }
+            if (e.clipboardData && e.clipboardData.items) {
+                for (let i = 0; i < e.clipboardData.items.length; i++) {
+                    const item = e.clipboardData.items[i];
+                    if (item.type.indexOf('image') !== -1) {
+                        const blob = item.getAsFile();
+                        if (blob) {
+                            const file = new File([blob], `slip-paste-${Date.now()}.png`, { type: blob.type });
+                            setSlipFile(file);
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+
+        // Close modal on Escape key
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('vip-modal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    closeVipModal();
+                }
+            }
+        });
+
+        // Setup Drag & Drop on dropzone
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropzone = document.getElementById('slip-dropzone');
+            if (dropzone) {
+                ['dragenter', 'dragover'].forEach(name => {
+                    dropzone.addEventListener(name, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropzone.classList.add('border-indigo-500', 'bg-zinc-900');
+                    }, false);
+                });
+                ['dragleave', 'drop'].forEach(name => {
+                    dropzone.addEventListener(name, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropzone.classList.remove('border-indigo-500', 'bg-zinc-900');
+                    }, false);
+                });
+                dropzone.addEventListener('drop', (e) => {
+                    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        setSlipFile(e.dataTransfer.files[0]);
+                    }
+                }, false);
+            }
+        });
     </script>
 </body>
 </html>

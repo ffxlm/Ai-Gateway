@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException, Depends, Form
+from fastapi import APIRouter, Request, HTTPException, Depends, Form, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import os
@@ -8,6 +8,10 @@ from app.services.user_service import (
     get_or_create_user, regenerate_user_key, add_vip_days, revoke_vip, delete_user,
     toggle_user_ban, reset_user_quota, get_all_users, get_portal_stats, is_vip_active,
     get_user_analytics
+)
+from app.services.payment_service import (
+    generate_promptpay_payload, verify_slip_with_slipok, is_trans_ref_used,
+    record_payment_transaction, get_recent_payments
 )
 from app.services.proxy_service import fetch_upstream_models
 
@@ -90,6 +94,7 @@ async def dashboard_page(request: Request):
         "discord_invite": discord_invite,
         "vip_daily_price": vip_daily_price,
         "vip_weekly_price": vip_weekly_price,
+        "promptpay_id": get_setting("promptpay_id", settings.PROMPTPAY_ID),
         "models": models_list,
         "analytics": analytics
     })
@@ -127,15 +132,20 @@ async def admin_page(request: Request):
         "master_router_url": get_setting("master_router_url", settings.MASTER_ROUTER_URL),
         "master_router_key": get_setting("master_router_key", settings.MASTER_ROUTER_KEY),
         "discord_invite_url": get_setting("discord_invite_url", settings.DISCORD_INVITE_URL),
-        "vip_daily_price": get_setting("vip_daily_price", "10"),
-        "vip_weekly_price": get_setting("vip_weekly_price", "50")
+        "vip_daily_price": get_setting("vip_daily_price", str(settings.VIP_DAILY_PRICE)),
+        "vip_weekly_price": get_setting("vip_weekly_price", str(settings.VIP_WEEKLY_PRICE)),
+        "promptpay_id": get_setting("promptpay_id", settings.PROMPTPAY_ID),
+        "slipok_branch_id": get_setting("slipok_branch_id", settings.SLIPOK_BRANCH_ID),
+        "slipok_api_key": get_setting("slipok_api_key", settings.SLIPOK_API_KEY)
     }
+    recent_payments = get_recent_payments(20)
     
     return templates.TemplateResponse(request, "admin.html", {
         "user": user,
         "stats": stats,
         "users": all_users,
-        "settings": current_settings
+        "settings": current_settings,
+        "payments": recent_payments
     })
 
 @pages_router.post("/api/user/regenerate-key")
@@ -214,3 +224,84 @@ async def admin_update_settings(request: Request):
     for k, v in form.items():
         update_setting(k, str(v))
     return RedirectResponse(url="/admin", status_code=303)
+
+@pages_router.get("/api/payment/promptpay-info")
+async def get_promptpay_info(request: Request, pass_type: str = "daily"):
+    user = get_session_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    promptpay_id = get_setting("promptpay_id", settings.PROMPTPAY_ID).strip()
+    if pass_type == "weekly":
+        amount = float(get_setting("vip_weekly_price", str(settings.VIP_WEEKLY_PRICE)))
+        days = 7
+        title = "Weekly Pass (7 วัน)"
+    else:
+        amount = float(get_setting("vip_daily_price", str(settings.VIP_DAILY_PRICE)))
+        days = 1
+        title = "Daily Pass (24 ชั่วโมง)"
+
+    qr_payload = generate_promptpay_payload(promptpay_id, amount) if promptpay_id else ""
+    return JSONResponse({
+        "status": "ok",
+        "pass_type": pass_type,
+        "title": title,
+        "amount": amount,
+        "days": days,
+        "promptpay_id": promptpay_id,
+        "qr_payload": qr_payload
+    })
+
+@pages_router.post("/api/payment/verify-slip")
+async def verify_slip_api(
+    request: Request,
+    pass_type: str = Form(...),
+    slip: UploadFile = File(...)
+):
+    user = get_session_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    if pass_type == "weekly":
+        expected_amount = float(get_setting("vip_weekly_price", str(settings.VIP_WEEKLY_PRICE)))
+        days = 7
+    else:
+        expected_amount = float(get_setting("vip_daily_price", str(settings.VIP_DAILY_PRICE)))
+        days = 1
+
+    file_bytes = await slip.read()
+    if len(file_bytes) == 0:
+        return JSONResponse({"status": "error", "message": "กรุณาแนบไฟล์รูปภาพสลิป"}, status_code=400)
+    if len(file_bytes) > 10 * 1024 * 1024:
+        return JSONResponse({"status": "error", "message": "ขนาดไฟล์สลิปใหญ่เกิน 10MB"}, status_code=400)
+
+    # Call SlipOK verification
+    verification = await verify_slip_with_slipok(file_bytes, slip.filename, expected_amount)
+    if not verification.get("success"):
+        return JSONResponse({
+            "status": "error",
+            "message": verification.get("message", "การตรวจสอบสลิปไม่สำเร็จ")
+        }, status_code=400)
+
+    trans_ref = str(verification.get("trans_ref", "")).strip()
+    if not trans_ref or is_trans_ref_used(trans_ref):
+        return JSONResponse({
+            "status": "error",
+            "message": "สลิปนี้ถูกใช้งานไปแล้ว ไม่สามารถใช้ซ้ำได้"
+        }, status_code=400)
+
+    # Record payment and grant VIP
+    recorded = record_payment_transaction(user["id"], pass_type, expected_amount, trans_ref, "slipok")
+    if not recorded:
+        return JSONResponse({
+            "status": "error",
+            "message": "เกิดข้อผิดพลาดในการบันทึกข้อมูล หรือสลิปถูกใช้งานไปแล้ว"
+        }, status_code=400)
+
+    new_exp = add_vip_days(user["id"], days)
+    return JSONResponse({
+        "status": "ok",
+        "message": f"ชำระเงินสำเร็จ! บัญชีของคุณได้รับการอัปเกรดเป็น VIP เรียบร้อยแล้ว (+{days} วัน)",
+        "days_added": days,
+        "vip_expires_at": new_exp
+    })
