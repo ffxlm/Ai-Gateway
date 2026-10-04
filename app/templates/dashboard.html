@@ -535,6 +535,10 @@
                             <span>สแกนด้วย Mobile Banking ทุกธนาคาร</span>
                         </div>
                     </div>
+                    <button type="button" onclick="downloadQrImage()" class="mt-2 text-[11px] font-medium px-3 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 text-zinc-700 hover:text-zinc-900 border border-zinc-200 transition flex items-center space-x-1.5 shadow-2xs" title="บันทึกรูปภาพ QR ลงในเครื่อง">
+                        <i class="fa-solid fa-download text-[10px] text-zinc-500"></i>
+                        <span>บันทึกรูป QR</span>
+                    </button>
                 </div>
 
                 <!-- Missing PromptPay ID Warning Box (If PromptPay ID is not configured) -->
@@ -558,18 +562,6 @@
                 <div id="exact-amount-notice" class="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-800/50 rounded-lg px-2.5 py-1.5 text-center flex items-center justify-center space-x-1.5">
                     <i class="fa-solid fa-triangle-exclamation shrink-0 text-xs text-amber-400"></i>
                     <span>กรุณาโอนเงินยอด ฿<span id="checkout-amount-warning">10.00</span> พอดีเพื่อให้ระบบตรวจสลิปผ่าน</span>
-                </div>
-
-                <!-- PromptPay Number & Copy Bar -->
-                <div class="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950 border border-zinc-800/80 text-xs">
-                    <div class="truncate">
-                        <span class="text-zinc-500">พร้อมเพย์:</span>
-                        <span id="checkout-promptpay-id" class="font-mono text-zinc-100 font-semibold select-all ml-1">{{ promptpay_id }}</span>
-                    </div>
-                    <button type="button" onclick="copyPromptPayId()" class="text-indigo-400 hover:text-indigo-300 font-medium flex items-center space-x-1 text-xs px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition shrink-0 ml-2">
-                        <i class="fa-solid fa-copy"></i>
-                        <span id="copy-pp-label">คัดลอก</span>
-                    </button>
                 </div>
 
                 <!-- Slip Upload / Paste Zone -->
@@ -1027,20 +1019,15 @@
             }
         }
 
-        function copyPromptPayId() {
-            const ppEl = document.getElementById('checkout-promptpay-id');
-            const ppId = ppEl ? ppEl.textContent.trim() : '';
-            if (!ppId) return;
-            navigator.clipboard.writeText(ppId).then(() => {
-                const label = document.getElementById('copy-pp-label');
-                if (label) {
-                    const oldText = label.textContent;
-                    label.textContent = 'คัดลอกแล้ว!';
-                    setTimeout(() => { label.textContent = oldText; }, 1800);
-                }
-            }).catch(() => {
-                alert('คัดลอกไม่สำเร็จ: ' + ppId);
-            });
+        function downloadQrImage() {
+            const img = document.getElementById('promptpay-qr-img');
+            if (!img || !img.src) return;
+            const a = document.createElement('a');
+            a.href = img.src;
+            a.download = `promptpay-qr-${currentPassType}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
 
         function setSlipFile(file) {
