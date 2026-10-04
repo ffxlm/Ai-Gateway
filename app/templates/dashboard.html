@@ -186,19 +186,17 @@
             <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-rose-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
                 <div class="flex items-center justify-between text-[11px] sm:text-xs text-rose-300/80">
                     <span class="truncate font-medium">VIP Expires In</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-hourglass-half text-xs sm:text-sm"></i>
-                    </div>
+                    <button type="button" onclick="openVipModal()" class="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 hover:text-white text-[10px] sm:text-xs font-medium transition cursor-pointer flex items-center space-x-1 shrink-0 shadow-inner">
+                        <i class="fa-solid fa-rotate-right text-[9px] sm:text-[10px]"></i>
+                        <span>ต่ออายุ</span>
+                    </button>
                 </div>
                 <div id="vip-expiry-countdown" class="text-base sm:text-2xl font-bold tracking-tight text-rose-300 font-mono">
                     --:--:--
                 </div>
-                <div class="text-[10px] sm:text-xs text-rose-400/80 truncate flex items-center justify-between">
-                    <span class="flex items-center space-x-1 truncate">
-                        <i class="fa-solid fa-calendar-check text-[9px]"></i>
-                        <span>Until: {{ user.vip_expires_at[:16].replace('T', ' ') if user.vip_expires_at else 'Active' }}</span>
-                    </span>
-                    <button type="button" onclick="openVipModal()" class="text-[10px] text-rose-300 hover:text-white underline font-medium ml-1.5 cursor-pointer shrink-0">ต่ออายุ</button>
+                <div class="text-[10px] sm:text-xs text-rose-400/80 flex items-center space-x-1.5 font-mono" title="VIP หมดอายุ: {{ user.vip_expires_at.replace('T', ' ') if user.vip_expires_at else 'Active' }}">
+                    <i class="fa-solid fa-calendar-check text-[9px] sm:text-[10px] text-rose-400 shrink-0"></i>
+                    <span class="whitespace-nowrap">Until: {{ user.vip_expires_at[:16].replace('T', ' ') if user.vip_expires_at else 'Active' }}</span>
                 </div>
             </div>
             {% else %}
