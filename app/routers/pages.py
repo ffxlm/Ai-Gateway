@@ -10,7 +10,7 @@ from app.services.user_service import (
     get_user_analytics
 )
 from app.services.payment_service import (
-    generate_promptpay_payload, verify_slip_with_slipok, is_trans_ref_used,
+    generate_promptpay_payload, generate_qr_data_url, verify_slip_with_slipok, is_trans_ref_used,
     record_payment_transaction, get_recent_payments
 )
 from app.services.proxy_service import fetch_upstream_models
@@ -242,6 +242,7 @@ async def get_promptpay_info(request: Request, pass_type: str = "daily"):
         title = "Daily Pass (24 ชั่วโมง)"
 
     qr_payload = generate_promptpay_payload(promptpay_id, amount) if promptpay_id else ""
+    qr_image_url = generate_qr_data_url(qr_payload) if qr_payload else ""
     return JSONResponse({
         "status": "ok",
         "pass_type": pass_type,
@@ -249,7 +250,8 @@ async def get_promptpay_info(request: Request, pass_type: str = "daily"):
         "amount": amount,
         "days": days,
         "promptpay_id": promptpay_id,
-        "qr_payload": qr_payload
+        "qr_payload": qr_payload,
+        "qr_image_url": qr_image_url
     })
 
 @pages_router.post("/api/payment/verify-slip")

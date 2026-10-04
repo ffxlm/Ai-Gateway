@@ -1,5 +1,8 @@
+import io
+import base64
 import json
 import httpx
+import qrcode
 from typing import Optional, Dict, Any
 from app.core.config import settings
 from app.core.database import db_session, get_setting
@@ -52,6 +55,26 @@ def generate_promptpay_payload(target: str, amount: Optional[float] = None) -> s
     
     raw = "".join(parts) + "6304"
     return raw + crc16_ccitt(raw)
+
+def generate_qr_data_url(payload: str) -> str:
+    """
+    Renders EMVCo payload string into a base64 PNG data URL directly on the server.
+    """
+    if not payload:
+        return ""
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=8,
+        border=2,
+    )
+    qr.add_data(payload)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    return f"data:image/png;base64,{b64}"
 
 async def verify_slip_with_slipok(file_bytes: bytes, filename: str, expected_amount: float) -> Dict[str, Any]:
     """

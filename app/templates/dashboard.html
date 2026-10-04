@@ -10,8 +10,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- QRCode.js -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -528,17 +526,34 @@
                     </div>
                 </div>
 
-                <!-- QR Code Box -->
-                <div class="bg-white p-3 rounded-xl mx-auto w-fit flex flex-col items-center shadow-md">
-                    <canvas id="promptpay-qr-canvas" class="w-[180px] h-[180px] block"></canvas>
+                <!-- QR Code Box (When PromptPay ID is present) -->
+                <div id="qr-box-container" class="bg-white p-3 rounded-xl mx-auto w-fit flex flex-col items-center shadow-md">
+                    <img id="promptpay-qr-img" src="" alt="PromptPay QR Code" class="w-[180px] h-[180px] block object-contain">
                     <div class="text-[10px] text-zinc-600 font-medium mt-1.5 flex items-center space-x-1.5">
                         <i class="fa-solid fa-qrcode text-zinc-500"></i>
                         <span>สแกนด้วย Mobile Banking ทุกธนาคาร</span>
                     </div>
                 </div>
 
+                <!-- Missing PromptPay ID Warning Box (If PromptPay ID is not configured) -->
+                <div id="no-promptpay-box" class="hidden p-4 rounded-xl bg-amber-950/40 border border-amber-800/60 text-amber-200 text-xs text-center space-y-2.5">
+                    <div class="flex items-center justify-center space-x-2 font-semibold text-amber-300">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+                        <span>ยังไม่ได้ระบุหมายเลขพร้อมเพย์ในระบบ</span>
+                    </div>
+                    <p class="text-[11px] text-zinc-400 leading-relaxed">กรุณาระบุหมายเลข PromptPay ID ในระบบ เพื่อให้ระบบสามารถสร้าง QR Code สำหรับรับชำระเงินได้</p>
+                    {% if is_admin %}
+                    <div>
+                        <a href="/admin" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition shadow-sm">
+                            <i class="fa-solid fa-gear"></i>
+                            <span>ตั้งค่า PromptPay ID ในหน้า Admin</span>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+
                 <!-- Exact Amount Notice -->
-                <div class="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-800/50 rounded-lg px-2.5 py-1.5 text-center flex items-center justify-center space-x-1.5">
+                <div id="exact-amount-notice" class="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-800/50 rounded-lg px-2.5 py-1.5 text-center flex items-center justify-center space-x-1.5">
                     <i class="fa-solid fa-triangle-exclamation shrink-0 text-xs text-amber-400"></i>
                     <span>กรุณาโอนเงินยอด ฿<span id="checkout-amount-warning">10.00</span> พอดีเพื่อให้ระบบตรวจสลิปผ่าน</span>
                 </div>
@@ -978,25 +993,21 @@
                     if (ppEl) ppEl.textContent = data.promptpay_id;
                 }
 
-                // Render QR code
-                const canvas = document.getElementById('promptpay-qr-canvas');
-                if (canvas && window.QRCode) {
-                    if (data.qr_payload) {
-                        canvas.style.display = 'block';
-                        QRCode.toCanvas(canvas, data.qr_payload, {
-                            width: 180,
-                            margin: 1,
-                            color: {
-                                dark: '#000000',
-                                light: '#ffffff'
-                            }
-                        }, function (error) {
-                            if (error) console.error('QR Render Error:', error);
-                        });
-                    } else {
-                        canvas.style.display = 'none';
-                        showCheckoutError('ยังไม่ได้กำหนดหมายเลขพร้อมเพย์ในระบบ กรุณาติดต่อแอดมินหรือระบุในหน้า Admin');
-                    }
+                // Update QR code & PromptPay view
+                const qrImg = document.getElementById('promptpay-qr-img');
+                const qrBox = document.getElementById('qr-box-container');
+                const noPpBox = document.getElementById('no-promptpay-box');
+                const exactNotice = document.getElementById('exact-amount-notice');
+
+                if (data.qr_image_url) {
+                    if (qrImg) qrImg.src = data.qr_image_url;
+                    if (qrBox) qrBox.classList.remove('hidden');
+                    if (noPpBox) noPpBox.classList.add('hidden');
+                    if (exactNotice) exactNotice.classList.remove('hidden');
+                } else {
+                    if (qrBox) qrBox.classList.add('hidden');
+                    if (noPpBox) noPpBox.classList.remove('hidden');
+                    if (exactNotice) exactNotice.classList.add('hidden');
                 }
 
                 // Switch views
