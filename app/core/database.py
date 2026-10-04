@@ -90,6 +90,7 @@ def init_db():
             "vip_daily_price": str(settings.VIP_DAILY_PRICE),
             "vip_weekly_price": str(settings.VIP_WEEKLY_PRICE),
             "promptpay_id": settings.PROMPTPAY_ID,
+            "promptpay_name": settings.PROMPTPAY_NAME,
             "slipok_branch_id": settings.SLIPOK_BRANCH_ID,
             "slipok_api_key": settings.SLIPOK_API_KEY
         }

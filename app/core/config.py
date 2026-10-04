@@ -36,6 +36,7 @@ class Settings:
 
     # Payment & SlipOK
     PROMPTPAY_ID: str = os.getenv("PROMPTPAY_ID", "")
+    PROMPTPAY_NAME: str = os.getenv("PROMPTPAY_NAME", "ธีรภัทร สุขเพีย")
     SLIPOK_BRANCH_ID: str = os.getenv("SLIPOK_BRANCH_ID", "77682")
     SLIPOK_API_KEY: str = os.getenv("SLIPOK_API_KEY", "SLIPOK4JOF2LJ")
 

@@ -95,6 +95,7 @@ async def dashboard_page(request: Request):
         "vip_daily_price": vip_daily_price,
         "vip_weekly_price": vip_weekly_price,
         "promptpay_id": get_setting("promptpay_id", settings.PROMPTPAY_ID),
+        "promptpay_name": get_setting("promptpay_name", settings.PROMPTPAY_NAME),
         "models": models_list,
         "analytics": analytics
     })
@@ -243,6 +244,7 @@ async def get_promptpay_info(request: Request, pass_type: str = "daily"):
 
     qr_payload = generate_promptpay_payload(promptpay_id, amount) if promptpay_id else ""
     qr_image_url = generate_qr_data_url(qr_payload) if qr_payload else ""
+    promptpay_name = get_setting("promptpay_name", settings.PROMPTPAY_NAME)
     return JSONResponse({
         "status": "ok",
         "pass_type": pass_type,
@@ -250,6 +252,7 @@ async def get_promptpay_info(request: Request, pass_type: str = "daily"):
         "amount": amount,
         "days": days,
         "promptpay_id": promptpay_id,
+        "promptpay_name": promptpay_name,
         "qr_payload": qr_payload,
         "qr_image_url": qr_image_url
     })

@@ -463,8 +463,7 @@
                     </div>
 
                     <!-- Weekly Pass -->
-                    <div class="p-3.5 sm:p-4 rounded-xl bg-zinc-950 border border-indigo-900/60 relative space-y-2">
-                        <div class="absolute -top-2.5 right-3 bg-indigo-600 text-white text-[9px] font-semibold uppercase px-2 py-0.5 rounded tracking-wider shadow-xs">Best Value</div>
+                    <div class="p-3.5 sm:p-4 rounded-xl bg-zinc-950 border border-zinc-800/80 space-y-2">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Weekly Pass</span>
                             <span class="text-base font-bold font-mono text-zinc-100">฿{{ vip_weekly_price }} <span class="text-xs text-zinc-500 font-normal font-sans">/ 7 วัน</span></span>
@@ -483,8 +482,8 @@
                                 <span>ประหยัดทันที ฿20 (คุ้มค่ายาวนาน 7 วันเต็ม)</span>
                             </li>
                         </ul>
-                        <button type="button" onclick="startVipCheckout('weekly')" class="w-full mt-2 py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition flex items-center justify-center space-x-1.5 shadow-sm">
-                            <i class="fa-solid fa-qrcode text-xs"></i>
+                        <button type="button" onclick="startVipCheckout('weekly')" class="w-full mt-2 py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium rounded-lg transition flex items-center justify-center space-x-1.5 border border-zinc-700/60 shadow-xs">
+                            <i class="fa-solid fa-qrcode text-indigo-400 text-xs"></i>
                             <span>เลือก Weekly Pass (฿{{ vip_weekly_price }})</span>
                         </button>
                     </div>
@@ -558,16 +557,22 @@
                     <span>กรุณาโอนเงินยอด ฿<span id="checkout-amount-warning">10.00</span> พอดีเพื่อให้ระบบตรวจสลิปผ่าน</span>
                 </div>
 
-                <!-- PromptPay ID Copy Box -->
-                <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs">
-                    <div class="truncate">
-                        <span class="text-zinc-500">พร้อมเพย์:</span>
-                        <span id="checkout-promptpay-id" class="font-mono text-zinc-200 font-semibold select-all ml-1">{{ promptpay_id }}</span>
+                <!-- PromptPay & Account Holder Details -->
+                <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800/80 space-y-2 text-xs">
+                    <div class="flex items-center justify-between">
+                        <span class="text-zinc-400">ชื่อบัญชี:</span>
+                        <span id="checkout-promptpay-name" class="font-medium text-zinc-100">{{ promptpay_name }}</span>
                     </div>
-                    <button type="button" onclick="copyPromptPayId()" class="text-indigo-400 hover:text-indigo-300 font-medium flex items-center space-x-1 text-xs px-2 py-1 rounded bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition shrink-0 ml-2">
-                        <i class="fa-solid fa-copy"></i>
-                        <span id="copy-pp-label">คัดลอก</span>
-                    </button>
+                    <div class="flex items-center justify-between pt-2 border-t border-zinc-800/70">
+                        <div class="truncate">
+                            <span class="text-zinc-400">พร้อมเพย์:</span>
+                            <span id="checkout-promptpay-id" class="font-mono text-zinc-200 font-semibold select-all ml-1">{{ promptpay_id }}</span>
+                        </div>
+                        <button type="button" onclick="copyPromptPayId()" class="text-indigo-400 hover:text-indigo-300 font-medium flex items-center space-x-1 text-xs px-2 py-1 rounded bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition shrink-0 ml-2">
+                            <i class="fa-solid fa-copy"></i>
+                            <span id="copy-pp-label">คัดลอก</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Slip Upload / Paste Zone -->
@@ -991,6 +996,11 @@
                 if (data.promptpay_id) {
                     const ppEl = document.getElementById('checkout-promptpay-id');
                     if (ppEl) ppEl.textContent = data.promptpay_id;
+                }
+
+                if (data.promptpay_name) {
+                    const nameEl = document.getElementById('checkout-promptpay-name');
+                    if (nameEl) nameEl.textContent = data.promptpay_name;
                 }
 
                 // Update QR code & PromptPay view
