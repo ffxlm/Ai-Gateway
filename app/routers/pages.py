@@ -274,7 +274,8 @@ async def admin_requests_page(request: Request):
         trial_user_ids = find_user_ids(filters["user_q"])
     else:
         trial_user_ids = None
-    trial_history = get_trial_history(user_ids=trial_user_ids, days=14)
+    trial_limit = 200
+    trial_history = get_trial_history(user_ids=trial_user_ids, days=14, limit=trial_limit)
 
     return templates.TemplateResponse(request, "admin_requests.html", {
         "user": user,
@@ -287,6 +288,7 @@ async def admin_requests_page(request: Request):
         "summary": summary,
         "model_options": FREE_MODELS + [m["id"] for m in PREMIUM_MODELS],
         "trial_history": trial_history,
+        "trial_limit": trial_limit,
         "usd_to_thb": _usd_rate(),
     })
 

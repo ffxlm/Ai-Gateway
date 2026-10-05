@@ -514,11 +514,13 @@ def get_request_summary(user_id=None, user_q=None, model=None, date_from=None, d
         return dict(row)
 
 
-def get_trial_history(user_ids=None, days: int = 14) -> List[Dict[str, Any]]:
+def get_trial_history(user_ids=None, days: int = 14, limit: int = 200) -> List[Dict[str, Any]]:
     """Daily trial consumption per user/model, newest first, with limit and % used.
 
     ``user_ids`` may be a list (from a username search) or None for everyone.
     An explicit empty list means "no matching user", so nothing is returned.
+    Capped at ``limit`` rows (largest consumers first) so the table never grows
+    unbounded; the caller can show a hint to narrow the search when it fills.
     """
     if user_ids is not None and not user_ids:
         return []
@@ -527,6 +529,7 @@ def get_trial_history(user_ids=None, days: int = 14) -> List[Dict[str, Any]]:
     if user_ids:
         clause = "AND t.user_id IN (" + ",".join(["?"] * len(user_ids)) + ")"
         params.extend(user_ids)
+    params.append(int(limit))
     with db_session() as conn:
         cursor = conn.cursor()
         cursor.execute(f"""
@@ -536,6 +539,7 @@ def get_trial_history(user_ids=None, days: int = 14) -> List[Dict[str, Any]]:
         LEFT JOIN users u ON u.id = t.user_id
         WHERE t.usage_date >= DATE('now', 'localtime', ?) {clause}
         ORDER BY t.usage_date DESC, t.tokens_used DESC
+        LIMIT ?
         """, params)
         rows = [dict(r) for r in cursor.fetchall()]
     for r in rows:

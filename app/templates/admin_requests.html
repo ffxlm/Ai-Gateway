@@ -214,13 +214,22 @@
 
         <!-- Trial History -->
         <div class="rounded-xl bg-zinc-900/60 border border-zinc-800 overflow-hidden">
-            <div class="px-4 sm:px-6 py-3 border-b border-zinc-800/80">
-                <h2 class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
-                    <i class="fa-solid fa-flask text-violet-400"></i>
-                    <span>Free Trial History (last 14 days)</span>
-                </h2>
-                <p class="text-[11px] text-zinc-400 mt-0.5">Daily trial tokens per user and model — proof the allowance resets at 00:00 ICT.</p>
+            <div class="px-4 sm:px-6 py-3 border-b border-zinc-800/80 flex items-start justify-between gap-3">
+                <div>
+                    <h2 class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
+                        <i class="fa-solid fa-flask text-violet-400"></i>
+                        <span>Free Trial History (last 14 days)</span>
+                    </h2>
+                    <p class="text-[11px] text-zinc-400 mt-0.5">Daily trial tokens per user and model — proof the allowance resets at 00:00 ICT.</p>
+                </div>
+                <span class="text-[10px] text-zinc-500 font-mono whitespace-nowrap shrink-0">max {{ trial_limit }} rows</span>
             </div>
+            {% if trial_history|length >= trial_limit %}
+            <div class="px-4 sm:px-6 py-2 bg-amber-950/30 border-b border-amber-900/40 text-[11px] text-amber-300 flex items-center gap-2">
+                <i class="fa-solid fa-circle-info text-[10px]"></i>
+                <span>Showing the top {{ trial_limit }} rows only — search a user above to narrow it down.</span>
+            </div>
+            {% endif %}
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs whitespace-nowrap">
                     <thead class="text-zinc-500 uppercase tracking-wider border-b border-zinc-800 font-mono text-[10px]">
