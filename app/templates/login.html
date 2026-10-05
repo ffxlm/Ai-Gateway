@@ -122,12 +122,13 @@
                         <span class="h-2.5 w-2.5 rounded-full bg-emerald-500/70"></span>
                         <span class="ml-2 text-[11px] text-zinc-500 font-mono">quickstart.sh</span>
                     </div>
-                    <pre class="p-4 text-[11px] leading-relaxed font-mono text-zinc-300 overflow-x-auto"><span class="text-zinc-500"># base URL + your personal key</span>
-<span class="text-emerald-400">curl</span> {{ api_endpoint or 'https://api.yourapp.com/v1' }}/chat/completions \
-  -H <span class="text-amber-300">"Authorization: Bearer sk-portal-..."</span> \
-  -d <span class="text-amber-300">'{"model": "deepseek-v4-flash",</span>
-<span class="text-amber-300">       "messages": [{"role": "user",</span>
-<span class="text-amber-300">         "content": "Hello!"}]}'</span></pre>
+                    <pre class="p-4 text-[11px] leading-relaxed font-mono text-zinc-300 overflow-x-auto"><span class="text-zinc-500"># POST to the base URL with your personal key</span>
+<span class="text-emerald-400">curl</span> <span class="text-sky-300">{{ api_endpoint }}</span><span class="text-zinc-400">/chat/completions</span> \
+  <span class="text-zinc-500">-H</span> <span class="text-amber-300">"Authorization: Bearer sk-portal-..."</span> \
+  <span class="text-zinc-500">-d</span> <span class="text-amber-300">'{ "model": "deepseek-v4-flash",</span>
+<span class="text-amber-300">        "messages": [</span>
+<span class="text-amber-300">          { "role": "user", "content": "Hi" }</span>
+<span class="text-amber-300">        ] }'</span></pre>
                 </div>
 
                 <!-- Stat chips -->

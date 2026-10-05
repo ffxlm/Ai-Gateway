@@ -203,12 +203,18 @@ async def login_page(request: Request):
     elif error:
         error_msg = "Authentication failed. Please try again."
 
+    # The login page is a marketing surface, so avoid showing a localhost URL
+    # there; fall back to a neutral example until a real domain is in use.
+    api_endpoint = f"{str(request.base_url).rstrip('/')}/v1"
+    if "localhost" in api_endpoint or "127.0.0.1" in api_endpoint:
+        api_endpoint = "https://api.yourdomain.com/v1"
+
     return templates.TemplateResponse(request, "login.html", {
         "error": error_msg,
         "free_models": FREE_MODELS,
         "usd_to_thb": _usd_rate(),
         "discord_invite": get_setting("discord_invite_url", settings.DISCORD_INVITE_URL),
-        "api_endpoint": f"{str(request.base_url).rstrip('/')}/v1",
+        "api_endpoint": api_endpoint,
     })
 
 
