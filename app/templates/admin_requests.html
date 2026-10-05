@@ -11,6 +11,27 @@
             background-color: #09090b;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
+        /* iOS Safari renders <input type="date"> with a native intrinsic width that
+           refuses to shrink inside the grid, overflowing the card. Strip the native
+           appearance and force it to respect the container width. */
+        input[type="date"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 100%;
+            min-width: 0;
+            max-width: 100%;
+            box-sizing: border-box;
+            min-height: 2.25rem;
+        }
+        input[type="date"]::-webkit-date-and-time-value {
+            text-align: left;
+            margin: 0;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            margin: 0;
+            padding: 0;
+        }
     </style>
 </head>
 <body class="text-zinc-100 min-h-screen flex flex-col antialiased">
@@ -60,15 +81,15 @@
 
         <!-- Filters -->
         <div class="p-4 sm:p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
-            <form method="GET" action="/admin/requests" class="grid grid-cols-2 lg:grid-cols-6 gap-3">
-                <div class="space-y-1 col-span-2 lg:col-span-1">
+            <form method="GET" action="/admin/requests" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                <div class="space-y-1 min-w-0 sm:col-span-2 lg:col-span-1">
                     <label class="text-[11px] font-medium text-zinc-400">User <span class="text-zinc-600">(type to search)</span></label>
                     <div class="relative">
                         <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-zinc-500 text-[10px]"></i>
                         <input type="text" name="user_q" value="{{ filters.user_q or '' }}" placeholder="username or ID" class="w-full bg-zinc-950 border border-zinc-800 rounded-md pl-7 pr-2.5 py-2 text-xs text-zinc-200 focus:outline-none focus:border-zinc-700">
                     </div>
                 </div>
-                <div class="space-y-1 col-span-2 lg:col-span-1">
+                <div class="space-y-1 min-w-0 sm:col-span-2 lg:col-span-1">
                     <label class="text-[11px] font-medium text-zinc-400">Model</label>
                     <select name="model" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-2 text-xs text-zinc-200 focus:outline-none focus:border-zinc-700">
                         <option value="">All models</option>
@@ -77,15 +98,15 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="space-y-1">
+                <div class="space-y-1 min-w-0">
                     <label class="text-[11px] font-medium text-zinc-400">From</label>
-                    <input type="date" name="date_from" value="{{ filters.date_from or '' }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-700">
+                    <input type="date" name="date_from" value="{{ filters.date_from or '' }}" class="w-full min-w-0 block [color-scheme:dark] bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-700">
                 </div>
-                <div class="space-y-1">
+                <div class="space-y-1 min-w-0">
                     <label class="text-[11px] font-medium text-zinc-400">To</label>
-                    <input type="date" name="date_to" value="{{ filters.date_to or '' }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-700">
+                    <input type="date" name="date_to" value="{{ filters.date_to or '' }}" class="w-full min-w-0 block [color-scheme:dark] bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-700">
                 </div>
-                <div class="space-y-1">
+                <div class="space-y-1 min-w-0">
                     <label class="text-[11px] font-medium text-zinc-400">Status</label>
                     <select name="status" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-2 text-xs text-zinc-200 focus:outline-none focus:border-zinc-700">
                         <option value="">Any</option>
@@ -94,19 +115,19 @@
                         <option value="403" {% if filters.status == '403' %}selected{% endif %}>403 Suspended</option>
                     </select>
                 </div>
-                <div class="space-y-1">
+                <div class="space-y-1 min-w-0">
                     <label class="text-[11px] font-medium text-zinc-400">Tier</label>
                     <label class="flex items-center gap-2 h-[38px] px-2.5 rounded-md bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 cursor-pointer">
-                        <input type="checkbox" name="premium_only" value="1" {% if filters.premium_only %}checked{% endif %} class="accent-violet-500">
-                        Premium only
+                        <input type="checkbox" name="premium_only" value="1" {% if filters.premium_only %}checked{% endif %} class="accent-violet-500 shrink-0">
+                        <span class="truncate">Premium only</span>
                     </label>
                 </div>
-                <div class="col-span-2 lg:col-span-6 flex flex-wrap items-center gap-2 pt-1">
-                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-semibold transition">
+                <div class="col-span-1 sm:col-span-2 lg:col-span-6 flex flex-wrap items-center gap-2 pt-1">
+                    <button type="submit" class="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-semibold transition whitespace-nowrap">
                         <i class="fa-solid fa-filter text-[10px] mr-1"></i>Apply
                     </button>
-                    <a href="/admin/requests" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-md text-xs font-semibold transition">Reset</a>
-                    <a href="/admin/requests/export{% if request.url.query %}?{{ request.url.query }}{% endif %}" class="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-700/50 rounded-md text-xs font-semibold transition ml-auto">
+                    <a href="/admin/requests" class="flex-1 sm:flex-none text-center px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-md text-xs font-semibold transition whitespace-nowrap">Reset</a>
+                    <a href="/admin/requests/export{% if request.url.query %}?{{ request.url.query }}{% endif %}" class="w-full sm:w-auto sm:ml-auto text-center px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-700/50 rounded-md text-xs font-semibold transition whitespace-nowrap">
                         <i class="fa-solid fa-file-csv text-[10px] mr-1"></i>Export CSV
                     </a>
                 </div>
