@@ -38,11 +38,14 @@
         {% endif %}
 
         <!-- Primary Action: Discord OAuth -->
-        <div class="pt-1">
+        <div class="pt-1 space-y-2.5">
             <a href="/auth/discord/login" class="w-full py-2.5 px-4 bg-[#5865F2] hover:bg-[#4752c4] text-white font-medium text-xs rounded-lg transition flex items-center justify-center space-x-2.5 shadow-sm active:scale-[0.99]">
                 <i class="fa-brands fa-discord text-base"></i>
                 <span>Sign in with Discord</span>
             </a>
+            <p class="text-center text-[11px] text-zinc-500">
+                เข้าสู่ระบบไม่ได้ หรือมีปัญหา? <a href="{{ discord_invite }}" target="_blank" rel="noopener" class="text-indigo-400 hover:text-indigo-300 font-medium">ติดต่อทีมงานผ่าน Discord</a>
+            </p>
         </div>
 
         <!-- Features & Benefits -->

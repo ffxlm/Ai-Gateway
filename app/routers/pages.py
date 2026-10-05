@@ -207,6 +207,7 @@ async def login_page(request: Request):
         "error": error_msg,
         "free_models": FREE_MODELS,
         "usd_to_thb": _usd_rate(),
+        "discord_invite": get_setting("discord_invite_url", settings.DISCORD_INVITE_URL),
     })
 
 
@@ -290,6 +291,7 @@ async def admin_requests_page(request: Request):
         "trial_history": trial_history,
         "trial_limit": trial_limit,
         "usd_to_thb": _usd_rate(),
+        "discord_invite": get_setting("discord_invite_url", settings.DISCORD_INVITE_URL),
     })
 
 
