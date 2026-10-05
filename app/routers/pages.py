@@ -2,17 +2,18 @@ from fastapi import APIRouter, Request, HTTPException, Depends, Form, File, Uplo
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import os
-from datetime import datetime
 from app.core.config import settings
 from app.core.database import db_session, get_setting, update_setting
+from app.core.catalog import FREE_MODELS, PREMIUM_MODELS
 from app.services.user_service import (
-    get_or_create_user, regenerate_user_key, add_vip_days, revoke_vip, delete_user,
-    toggle_user_ban, reset_user_quota, get_all_users, get_portal_stats, is_vip_active,
-    get_user_analytics, get_portal_analytics, apply_daily_rollover
+    get_or_create_user, regenerate_user_key, delete_user, toggle_user_ban,
+    get_all_users, get_portal_stats, get_user_analytics, get_portal_analytics,
+    add_balance, get_wallet_transactions, get_all_wallet_transactions,
+    premium_trial_status,
 )
 from app.services.payment_service import (
     generate_promptpay_payload, generate_qr_data_url, verify_slip_with_slipok, is_trans_ref_used,
-    record_payment_transaction, get_recent_payments
+    record_payment_transaction, get_recent_payments,
 )
 from app.services.proxy_service import fetch_upstream_models
 
@@ -20,6 +21,36 @@ TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__f
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 pages_router = APIRouter(tags=["Pages"])
+
+
+def _fmt_usd(value) -> str:
+    """Compact USD formatting: 2 decimals normally, more when the amount is tiny."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        v = 0.0
+    a = abs(v)
+    if a == 0:
+        return "0.00"
+    if a >= 1:
+        return f"{v:,.2f}"
+    if a >= 0.01:
+        return f"{v:.4f}"
+    return f"{v:.6f}"
+
+
+def _fmt_thb(value, rate) -> str:
+    """Convert a USD amount to THB at ``rate`` and format it with 2 decimals."""
+    try:
+        v = float(value) * float(rate)
+    except (TypeError, ValueError):
+        v = 0.0
+    return f"{v:,.2f}"
+
+
+templates.env.filters["usd"] = _fmt_usd
+templates.env.filters["thb"] = _fmt_thb
+
 
 def get_session_user(request: Request):
     user_id = request.cookies.get("portal_session")
@@ -32,15 +63,47 @@ def get_session_user(request: Request):
         user = dict(row) if row else None
     if not user:
         return None
-    # Apply the daily quota rollover so the dashboard shows the reset right after midnight.
-    return apply_daily_rollover(user)
+    return user
+
+
+def _usd_rate() -> float:
+    try:
+        rate = float(get_setting("usd_to_thb", str(settings.USD_TO_THB)) or settings.USD_TO_THB)
+    except (TypeError, ValueError):
+        rate = float(settings.USD_TO_THB)
+    return rate if rate > 0 else float(settings.USD_TO_THB)
+
+
+def _min_topup_thb() -> float:
+    try:
+        return float(get_setting("min_topup_thb", str(settings.MIN_TOPUP_THB)) or settings.MIN_TOPUP_THB)
+    except (TypeError, ValueError):
+        return float(settings.MIN_TOPUP_THB)
+
+
+def _topup_packages(rate: float) -> list:
+    raw = get_setting("topup_packages_thb", settings.TOPUP_PACKAGES_THB) or ""
+    packages = []
+    for token in raw.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        try:
+            thb = int(float(token))
+        except ValueError:
+            continue
+        if thb <= 0:
+            continue
+        packages.append({"thb": thb, "usd": round(thb / rate, 2) if rate > 0 else 0})
+    return packages
+
 
 @pages_router.get("/", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     user = get_session_user(request)
     if not user:
         return RedirectResponse(url="/login")
-        
+
     is_real_admin = (user.get("role") == "admin")
 
     # Handle view switcher for admin
@@ -59,58 +122,45 @@ async def dashboard_page(request: Request):
     preview_as_user = (view_override == "user")
     effective_role = "user" if preview_as_user else user.get("role")
 
-    daily_limit = int(get_setting("daily_free_tokens", str(settings.DAILY_FREE_TOKENS)))
-    is_vip = is_vip_active(user)
-    discord_invite = get_setting("discord_invite_url", settings.DISCORD_INVITE_URL)
-    vip_daily_price = get_setting("vip_daily_price", "10")
-    vip_weekly_price = get_setting("vip_weekly_price", "50")
-    
-    # Calculate percentage for quota bar
-    used = user.get("daily_token_usage", 0)
-    pct = min(int((used / daily_limit) * 100), 100) if daily_limit > 0 else 0
-    
+    rate = _usd_rate()
     base_url = str(request.base_url).rstrip("/")
     api_endpoint = f"{base_url}/v1"
-    
-    # Exactly the 7 models requested
-    TARGET_MODELS = [
-        "deepseek-v4-flash",
-        "GLM-5.3-Flash",
-        "grok-4.7-xhigh",
-        "grok-4.7",
-        "qwen3.8-27b",
-        "MiniMax-M2.7",
-        "muse-spark-1.3"
-    ]
-    models_list = TARGET_MODELS
-    
-    # User Usage Analytics (initial 24h)
+
     analytics = get_user_analytics(user["id"], "24h")
-    
+    wallet_tx = get_wallet_transactions(user["id"], 12)
+
+    # Per-model daily trial meters (each premium model gets its own allowance).
+    trial_by_model = {m["id"]: premium_trial_status(user["id"], m["id"]) for m in PREMIUM_MODELS}
+    any_trial_remaining = any(s["remaining"] > 0 for s in trial_by_model.values())
+
     return templates.TemplateResponse(request, "dashboard.html", {
         "user": user,
-        "is_vip": is_vip,
         "is_admin": is_real_admin,
         "preview_as_user": preview_as_user,
         "effective_role": effective_role,
-        "daily_limit": daily_limit,
-        "quota_pct": pct,
+        "balance": float(user.get("balance") or 0),
+        "usd_to_thb": rate,
+        "min_topup_thb": _min_topup_thb(),
+        "topup_packages": _topup_packages(rate),
         "api_endpoint": api_endpoint,
-        "discord_invite": discord_invite,
-        "vip_daily_price": vip_daily_price,
-        "vip_weekly_price": vip_weekly_price,
+        "discord_invite": get_setting("discord_invite_url", settings.DISCORD_INVITE_URL),
         "promptpay_id": get_setting("promptpay_id", settings.PROMPTPAY_ID),
         "promptpay_name": get_setting("promptpay_name", settings.PROMPTPAY_NAME),
-        "models": models_list,
-        "analytics": analytics
+        "models": FREE_MODELS,
+        "premium_models": PREMIUM_MODELS,
+        "trial_by_model": trial_by_model,
+        "any_trial_remaining": any_trial_remaining,
+        "wallet_tx": wallet_tx,
+        "analytics": analytics,
     })
+
 
 @pages_router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     user = get_session_user(request)
     if user:
         return RedirectResponse(url="/")
-        
+
     error = request.query_params.get("error")
     error_msg = None
     if error == "discord_denied":
@@ -118,43 +168,49 @@ async def login_page(request: Request):
     elif error:
         error_msg = "Authentication failed. Please try again."
 
-    daily_tokens = int(get_setting("daily_free_tokens", str(settings.DAILY_FREE_TOKENS)))
     return templates.TemplateResponse(request, "login.html", {
-        "daily_tokens": f"{daily_tokens:,}",
-        "error": error_msg
+        "error": error_msg,
+        "free_models": FREE_MODELS,
+        "usd_to_thb": _usd_rate(),
     })
+
 
 @pages_router.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
     user = get_session_user(request)
     if not user or user.get("role") != "admin":
         return RedirectResponse(url="/")
-        
+
     stats = get_portal_stats()
     all_users = get_all_users()
-    
+
     current_settings = {
-        "daily_free_tokens": get_setting("daily_free_tokens", str(settings.DAILY_FREE_TOKENS)),
         "master_router_url": get_setting("master_router_url", settings.MASTER_ROUTER_URL),
         "master_router_key": get_setting("master_router_key", settings.MASTER_ROUTER_KEY),
         "discord_invite_url": get_setting("discord_invite_url", settings.DISCORD_INVITE_URL),
-        "vip_daily_price": get_setting("vip_daily_price", str(settings.VIP_DAILY_PRICE)),
-        "vip_weekly_price": get_setting("vip_weekly_price", str(settings.VIP_WEEKLY_PRICE)),
         "promptpay_id": get_setting("promptpay_id", settings.PROMPTPAY_ID),
+        "promptpay_name": get_setting("promptpay_name", settings.PROMPTPAY_NAME),
         "slipok_branch_id": get_setting("slipok_branch_id", settings.SLIPOK_BRANCH_ID),
-        "slipok_api_key": get_setting("slipok_api_key", settings.SLIPOK_API_KEY)
+        "slipok_api_key": get_setting("slipok_api_key", settings.SLIPOK_API_KEY),
+        "usd_to_thb": get_setting("usd_to_thb", str(settings.USD_TO_THB)),
+        "min_topup_thb": get_setting("min_topup_thb", str(settings.MIN_TOPUP_THB)),
+        "topup_packages_thb": get_setting("topup_packages_thb", settings.TOPUP_PACKAGES_THB),
+        "premium_trial_tokens_per_day": get_setting("premium_trial_tokens_per_day", str(settings.PREMIUM_TRIAL_TOKENS_PER_DAY)),
     }
     recent_payments = get_recent_payments(20)
+    wallet_tx = get_all_wallet_transactions(30)
     portal_analytics = get_portal_analytics("7d")
-    
+
     return templates.TemplateResponse(request, "admin.html", {
         "user": user,
         "stats": stats,
         "users": all_users,
         "settings": current_settings,
         "payments": recent_payments,
-        "analytics": portal_analytics
+        "wallet_tx": wallet_tx,
+        "analytics": portal_analytics,
     })
+
 
 @pages_router.post("/api/user/regenerate-key")
 async def regenerate_key_api(request: Request):
@@ -164,6 +220,7 @@ async def regenerate_key_api(request: Request):
     new_key = regenerate_user_key(user["id"])
     return JSONResponse({"status": "ok", "api_key": new_key})
 
+
 @pages_router.get("/api/user/analytics")
 async def user_analytics_api(request: Request, range: str = "24h"):
     user = get_session_user(request)
@@ -171,6 +228,7 @@ async def user_analytics_api(request: Request, range: str = "24h"):
         raise HTTPException(status_code=401, detail="Unauthorized")
     data = get_user_analytics(user["id"], range)
     return JSONResponse({"status": "ok", "data": data})
+
 
 @pages_router.get("/api/admin/analytics")
 async def admin_analytics_api(request: Request, range: str = "24h"):
@@ -180,26 +238,27 @@ async def admin_analytics_api(request: Request, range: str = "24h"):
     data = get_portal_analytics(range)
     return JSONResponse({"status": "ok", "data": data})
 
-@pages_router.post("/api/admin/upgrade-vip")
-async def admin_upgrade_vip(request: Request):
-    user = get_session_user(request)
-    if not user or user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Forbidden")
-    data = await request.json()
-    target_id = data.get("user_id")
-    days = int(data.get("days", 1))
-    new_exp = add_vip_days(target_id, days)
-    return JSONResponse({"status": "ok", "vip_expires_at": new_exp})
 
-@pages_router.post("/api/admin/revoke-vip")
-async def admin_revoke_vip(request: Request):
+@pages_router.post("/api/admin/adjust-balance")
+async def admin_adjust_balance(request: Request):
     user = get_session_user(request)
     if not user or user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Forbidden")
     data = await request.json()
     target_id = data.get("user_id")
-    revoke_vip(target_id)
-    return JSONResponse({"status": "ok"})
+    try:
+        amount = float(data.get("amount_usd", 0))
+    except (TypeError, ValueError):
+        amount = 0.0
+    note = str(data.get("note", "") or "").strip()
+    if not target_id or amount == 0:
+        return JSONResponse({"status": "error", "message": "ระบุผู้ใช้และจำนวนเงิน USD"}, status_code=400)
+    new_balance = add_balance(
+        target_id, amount, "adjust",
+        note or ("Admin credit" if amount > 0 else "Admin debit"),
+    )
+    return JSONResponse({"status": "ok", "balance": new_balance})
+
 
 @pages_router.post("/api/admin/delete-user")
 async def admin_delete_user(request: Request):
@@ -207,9 +266,9 @@ async def admin_delete_user(request: Request):
     if not user or user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Forbidden")
     data = await request.json()
-    target_id = data.get("user_id")
-    delete_user(target_id)
+    delete_user(data.get("user_id"))
     return JSONResponse({"status": "ok"})
+
 
 @pages_router.post("/api/admin/toggle-ban")
 async def admin_toggle_ban(request: Request):
@@ -217,19 +276,9 @@ async def admin_toggle_ban(request: Request):
     if not user or user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Forbidden")
     data = await request.json()
-    target_id = data.get("user_id")
-    is_banned = toggle_user_ban(target_id)
+    is_banned = toggle_user_ban(data.get("user_id"))
     return JSONResponse({"status": "ok", "is_banned": is_banned})
 
-@pages_router.post("/api/admin/reset-quota")
-async def admin_reset_quota(request: Request):
-    user = get_session_user(request)
-    if not user or user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Forbidden")
-    data = await request.json()
-    target_id = data.get("user_id")
-    reset_user_quota(target_id)
-    return JSONResponse({"status": "ok"})
 
 @pages_router.post("/api/admin/settings")
 async def admin_update_settings(request: Request):
@@ -241,53 +290,52 @@ async def admin_update_settings(request: Request):
         update_setting(k, str(v))
     return RedirectResponse(url="/admin", status_code=303)
 
+
 @pages_router.get("/api/payment/promptpay-info")
-async def get_promptpay_info(request: Request, pass_type: str = "daily"):
+async def get_promptpay_info(request: Request, amount: float = 0):
     user = get_session_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    
-    promptpay_id = get_setting("promptpay_id", settings.PROMPTPAY_ID).strip()
-    if pass_type == "weekly":
-        amount = float(get_setting("vip_weekly_price", str(settings.VIP_WEEKLY_PRICE)))
-        days = 7
-        title = "Weekly Pass (7 วัน)"
-    else:
-        amount = float(get_setting("vip_daily_price", str(settings.VIP_DAILY_PRICE)))
-        days = 1
-        title = "Daily Pass (24 ชั่วโมง)"
 
+    rate = _usd_rate()
+    min_thb = _min_topup_thb()
+    amount = round(float(amount or 0), 2)
+    if amount < min_thb:
+        return JSONResponse({"status": "error", "message": f"ยอดเติมขั้นต่ำ ฿{min_thb:,.0f}"}, status_code=400)
+
+    amount_usd = round(amount / rate, 2) if rate > 0 else 0
+    promptpay_id = get_setting("promptpay_id", settings.PROMPTPAY_ID).strip()
+    promptpay_name = get_setting("promptpay_name", settings.PROMPTPAY_NAME)
     qr_payload = generate_promptpay_payload(promptpay_id, amount) if promptpay_id else ""
     qr_image_url = generate_qr_data_url(qr_payload) if qr_payload else ""
-    promptpay_name = get_setting("promptpay_name", settings.PROMPTPAY_NAME)
+
     return JSONResponse({
         "status": "ok",
-        "pass_type": pass_type,
-        "title": title,
-        "amount": amount,
-        "days": days,
+        "amount_thb": amount,
+        "amount_usd": amount_usd,
+        "usd_to_thb": rate,
         "promptpay_id": promptpay_id,
         "promptpay_name": promptpay_name,
         "qr_payload": qr_payload,
-        "qr_image_url": qr_image_url
+        "qr_image_url": qr_image_url,
     })
+
 
 @pages_router.post("/api/payment/verify-slip")
 async def verify_slip_api(
     request: Request,
-    pass_type: str = Form(...),
-    slip: UploadFile = File(...)
+    amount: float = Form(...),
+    slip: UploadFile = File(...),
 ):
     user = get_session_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
-        
-    if pass_type == "weekly":
-        expected_amount = float(get_setting("vip_weekly_price", str(settings.VIP_WEEKLY_PRICE)))
-        days = 7
-    else:
-        expected_amount = float(get_setting("vip_daily_price", str(settings.VIP_DAILY_PRICE)))
-        days = 1
+
+    rate = _usd_rate()
+    min_thb = _min_topup_thb()
+    amount = round(float(amount or 0), 2)
+    if amount < min_thb:
+        return JSONResponse({"status": "error", "message": f"ยอดเติมขั้นต่ำ ฿{min_thb:,.0f}"}, status_code=400)
 
     file_bytes = await slip.read()
     if len(file_bytes) == 0:
@@ -295,46 +343,38 @@ async def verify_slip_api(
     if len(file_bytes) > 10 * 1024 * 1024:
         return JSONResponse({"status": "error", "message": "ขนาดไฟล์สลิปใหญ่เกิน 10MB"}, status_code=400)
 
-    # Call SlipOK verification
-    verification = await verify_slip_with_slipok(file_bytes, slip.filename, expected_amount)
+    # Call SlipOK verification against the THB amount
+    verification = await verify_slip_with_slipok(file_bytes, slip.filename, amount)
     if not verification.get("success"):
         return JSONResponse({
             "status": "error",
-            "message": verification.get("message", "การตรวจสอบสลิปไม่สำเร็จ")
+            "message": verification.get("message", "การตรวจสอบสลิปไม่สำเร็จ"),
         }, status_code=400)
 
     trans_ref = str(verification.get("trans_ref", "")).strip()
     if not trans_ref or is_trans_ref_used(trans_ref):
         return JSONResponse({
             "status": "error",
-            "message": "สลิปนี้ถูกใช้งานไปแล้ว ไม่สามารถใช้ซ้ำได้"
+            "message": "สลิปนี้ถูกใช้งานไปแล้ว ไม่สามารถใช้ซ้ำได้",
         }, status_code=400)
 
-    # Record payment and grant VIP
-    recorded = record_payment_transaction(user["id"], pass_type, expected_amount, trans_ref, "slipok")
+    recorded = record_payment_transaction(user["id"], "topup", amount, trans_ref, "slipok")
     if not recorded:
         return JSONResponse({
             "status": "error",
-            "message": "เกิดข้อผิดพลาดในการบันทึกข้อมูล หรือสลิปถูกใช้งานไปแล้ว"
+            "message": "เกิดข้อผิดพลาดในการบันทึกข้อมูล หรือสลิปถูกใช้งานไปแล้ว",
         }, status_code=400)
 
-    was_vip = is_vip_active(user)
-    new_exp = add_vip_days(user["id"], days)
-
-    try:
-        new_exp_display = datetime.fromisoformat(new_exp).strftime("%d/%m/%Y %H:%M")
-    except Exception:
-        new_exp_display = new_exp
-
-    if was_vip:
-        message = f"ต่ออายุ VIP สำเร็จ! เพิ่มเวลา +{days} วัน (วันหมดอายุใหม่: {new_exp_display})"
-    else:
-        message = f"อัปเกรด VIP สำเร็จ! บัญชีของคุณเป็น Unlimited VIP แล้ว (+{days} วัน)"
+    usd_credited = round(amount / rate, 2) if rate > 0 else 0
+    new_balance = add_balance(
+        user["id"], usd_credited, "topup",
+        f"Top-up ฿{amount:,.2f}", trans_ref,
+    )
 
     return JSONResponse({
         "status": "ok",
-        "message": message,
-        "renewal": was_vip,
-        "days_added": days,
-        "vip_expires_at": new_exp
+        "message": f"เติมเงินสำเร็จ! ได้รับ ${usd_credited:,.2f} เข้ากระเป๋าของคุณ",
+        "usd_credited": usd_credited,
+        "amount_thb": amount,
+        "balance": new_balance,
     })

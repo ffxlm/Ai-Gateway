@@ -25,16 +25,19 @@ class Settings:
     DISCORD_REDIRECT_URI: str = os.getenv("DISCORD_REDIRECT_URI", "http://localhost:8080/auth/discord/callback")
     
     # Business Rules
-    DAILY_FREE_TOKENS: int = int(os.getenv("DAILY_FREE_TOKENS", "5000000"))
-    FREE_CONCURRENCY_LIMIT: int = int(os.getenv("FREE_CONCURRENCY_LIMIT", "5"))
-    VIP_CONCURRENCY_LIMIT: int = int(os.getenv("VIP_CONCURRENCY_LIMIT", "20"))
-    
+    # Free models are unlimited; the wallet only pays for premium (xHigh) usage.
+    CONCURRENCY_LIMIT: int = int(os.getenv("CONCURRENCY_LIMIT", "10"))
+    # Premium models get this many free tokens per day before wallet billing kicks in.
+    PREMIUM_TRIAL_TOKENS_PER_DAY: int = int(os.getenv("PREMIUM_TRIAL_TOKENS_PER_DAY", "1000000"))
+    USD_TO_THB: float = float(os.getenv("USD_TO_THB", "35"))
+    MIN_TOPUP_THB: int = int(os.getenv("MIN_TOPUP_THB", "10"))
+    # Comma-separated THB quick-pick amounts shown in the top-up modal.
+    TOPUP_PACKAGES_THB: str = os.getenv("TOPUP_PACKAGES_THB", "10,35,70,175,350,700")
+
     # Admin & Support
     ADMIN_SECRET: str = os.getenv("ADMIN_SECRET", "admin-pass-2026")
     ADMIN_DISCORD_IDS: str = os.getenv("ADMIN_DISCORD_IDS", "1519726876984086528")
     DISCORD_INVITE_URL: str = os.getenv("DISCORD_INVITE_URL", "https://discord.gg/N7Kuayuzxb")
-    VIP_DAILY_PRICE: int = int(os.getenv("VIP_DAILY_PRICE", "10"))
-    VIP_WEEKLY_PRICE: int = int(os.getenv("VIP_WEEKLY_PRICE", "50"))
 
     # Payment & SlipOK
     PROMPTPAY_ID: str = os.getenv("PROMPTPAY_ID", "")

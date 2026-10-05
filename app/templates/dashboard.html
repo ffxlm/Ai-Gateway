@@ -37,7 +37,6 @@
 <body class="text-zinc-100 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
 
     <!-- Top Navigation Bar -->
-    <!-- Top Navigation Bar -->
     <header class="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2">
             <!-- Brand Logo -->
@@ -58,7 +57,7 @@
             <!-- User Menu & Actions -->
             <div class="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
                 {% if effective_role == 'admin' %}
-                <!-- Admin Controls: Cohesive Segmented Control -->
+                <!-- Admin Controls -->
                 <div class="inline-flex items-center rounded-lg bg-zinc-900/90 border border-zinc-800 p-0.5 shadow-xs">
                     <a href="/admin" class="px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md text-zinc-200 hover:text-white hover:bg-zinc-800 transition flex items-center space-x-1.5 whitespace-nowrap" title="Admin Control Panel">
                         <i class="fa-solid fa-shield-halved text-indigo-400 text-xs"></i>
@@ -73,11 +72,11 @@
                     {% endif %}
                 </div>
                 {% else %}
-                <!-- Regular User: Upgrade Button -->
+                <!-- Regular User: Top Up -->
                 <div class="inline-flex items-center space-x-1.5">
-                    <button onclick="openVipModal()" class="px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-medium rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 hover:border-violet-500/50 transition flex items-center space-x-1.5 shadow-xs group whitespace-nowrap" title="{% if is_vip %}ต่ออายุ VIP Membership{% else %}Upgrade VIP Membership{% endif %}">
-                        <i class="fa-solid fa-crown text-violet-400 group-hover:scale-110 transition-transform text-xs"></i>
-                        <span>{% if is_vip %}Extend VIP{% else %}Upgrade{% endif %}</span>
+                    <button onclick="openTopupModal()" class="px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-medium rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition flex items-center space-x-1.5 shadow-xs group whitespace-nowrap" title="Top up your wallet">
+                        <i class="fa-solid fa-wallet text-emerald-400 group-hover:scale-110 transition-transform text-xs"></i>
+                        <span>Top Up</span>
                     </button>
                     {% if is_admin %}
                     <a href="/?view=admin" class="px-2 sm:px-2.5 py-1 sm:py-1.5 text-xs font-medium rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition flex items-center space-x-1 whitespace-nowrap shadow-xs" title="Switch back to Admin View">
@@ -92,13 +91,11 @@
                 <div class="flex items-center space-x-1.5 sm:space-x-2 pl-1.5 border-l border-zinc-800/80">
                     <img src="{{ user.avatar_url }}" alt="Avatar" class="h-7 w-7 sm:h-8 sm:w-8 rounded-full border border-zinc-700/80 shrink-0">
                     <div class="hidden md:block text-left">
-                        <div class="text-xs font-semibold text-zinc-200 leading-tight truncate max-w-[100px]">{{ user.username }}</div>
-                        <div class="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">
-                            {% if is_vip %}
-                            <span class="text-violet-400 font-semibold"><i class="fa-solid fa-crown text-[9px] mr-0.5"></i>VIP Active</span>
-                            {% else %}
-                            <span>Free Tier</span>
-                            {% endif %}
+                        <div class="text-xs font-semibold text-zinc-200 leading-tight truncate max-w-[120px]">{{ user.username }}</div>
+                        <div class="text-[10px] text-zinc-500 uppercase tracking-wider font-mono whitespace-nowrap">
+                            <span class="text-emerald-400 font-semibold">${{ balance | usd }}</span>
+                            <span class="text-zinc-600">·</span>
+                            <span class="text-zinc-400">฿{{ balance | thb(usd_to_thb) }}</span>
                         </div>
                     </div>
                     <a href="/auth/logout" title="Sign Out" class="p-1.5 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/80 rounded-md transition shrink-0">
@@ -112,135 +109,69 @@
     <!-- Main Content Container -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
-        <!-- Top Metrics Grid (2x2 on Mobile, 4 Cols on Desktop) -->
+        <!-- Top Metrics Grid -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            
-            <!-- Metric 1: Daily Quota -->
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 {% if is_vip %}hover:border-violet-500/40{% else %}hover:border-indigo-500/40{% endif %} transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs {% if is_vip %}text-violet-300/80{% else %}text-zinc-400{% endif %}">
-                    <span class="truncate font-medium">{% if is_vip %}VIP Quota{% else %}Daily Quota{% endif %}</span>
-                    {% if is_vip %}
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-violet-500/10 border border-violet-500/25 text-violet-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-infinity text-xs sm:text-sm"></i>
-                    </div>
-                    {% else %}
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-chart-pie text-xs sm:text-sm"></i>
-                    </div>
-                    {% endif %}
-                </div>
-                <div class="space-y-1">
-                    {% if is_vip %}
-                    <span class="text-base sm:text-2xl font-bold tracking-tight text-violet-400 font-mono">UNLIMITED</span>
-                    {% else %}
-                    <div class="flex flex-col xl:flex-row xl:items-baseline xl:space-x-1.5">
-                        <span class="text-base sm:text-2xl font-bold tracking-tight text-zinc-100 font-mono">{{ "{:,}".format(user.daily_token_usage) }}</span>
-                        <span class="text-[10px] sm:text-xs text-zinc-500 font-mono truncate">/ {{ "{:,}".format(daily_limit) }}</span>
-                    </div>
-                    {% endif %}
-                </div>
-                {% if not is_vip %}
-                <div class="space-y-1">
-                    <div class="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-indigo-500 h-1.5 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(99,102,241,0.5)]" style="width: {{ quota_pct }}%;"></div>
-                    </div>
-                    <div class="text-[10px] sm:text-[11px] text-zinc-500 text-right">{{ quota_pct }}% used</div>
-                </div>
-                {% else %}
-                <div class="text-[10px] sm:text-[11px] text-violet-400/90 flex items-center space-x-1 font-medium">
-                    <i class="fa-solid fa-bolt text-[9px] text-violet-400"></i>
-                    <span>No token restrictions</span>
-                </div>
-                {% endif %}
-            </div>
 
-            <!-- Metric 2: Plan Tier (Cyan Theme) -->
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 {% if is_vip %}hover:border-cyan-500/40{% else %}hover:border-zinc-700{% endif %} transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs {% if is_vip %}text-cyan-300/80{% else %}text-zinc-400{% endif %}">
-                    <span class="truncate font-medium">Current Plan</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg {% if is_vip %}bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.15)]{% else %}bg-zinc-800 border border-zinc-700 text-zinc-300{% endif %} flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid {% if is_vip %}fa-crown{% else %}fa-shield-halved{% endif %} text-xs sm:text-sm"></i>
-                    </div>
-                </div>
-                <div class="text-base sm:text-2xl font-bold tracking-tight flex items-center space-x-1.5">
-                    {% if is_vip %}
-                    <span class="text-cyan-400 font-semibold">VIP Member</span>
-                    {% else %}
-                    <span class="truncate text-zinc-200">Standard Free</span>
-                    {% endif %}
-                </div>
-                <div class="text-[10px] sm:text-xs truncate">
-                    {% if is_vip %}
-                    <span class="text-cyan-400/80 font-medium flex items-center space-x-1">
-                        <i class="fa-solid fa-sparkles text-[9px]"></i>
-                        <span>Unlimited Priority</span>
-                    </span>
-                    {% else %}
-                    <span class="text-zinc-400">5,000,000 tokens / day</span>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Metric 3: Quota Reset Timer / VIP Expiry (Rose Theme) -->
-            {% if is_vip %}
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-rose-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs text-rose-300/80">
-                    <span class="truncate font-medium">VIP Expires In</span>
-                    <button type="button" onclick="openVipModal()" class="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 hover:text-white text-[10px] sm:text-xs font-medium transition cursor-pointer flex items-center space-x-1 shrink-0 shadow-inner">
-                        <i class="fa-solid fa-rotate-right text-[9px] sm:text-[10px]"></i>
-                        <span>ต่ออายุ</span>
-                    </button>
-                </div>
-                <div id="vip-expiry-countdown" class="text-base sm:text-2xl font-bold tracking-tight text-rose-300 font-mono">
-                    --:--:--
-                </div>
-                <div class="text-[10px] sm:text-xs text-rose-400/80 flex items-center space-x-1.5 font-mono" title="VIP หมดอายุ: {{ user.vip_expires_at.replace('T', ' ') if user.vip_expires_at else 'Active' }}">
-                    <i class="fa-solid fa-calendar-check text-[9px] sm:text-[10px] text-rose-400 shrink-0"></i>
-                    <span class="whitespace-nowrap">Until: {{ user.vip_expires_at[:16].replace('T', ' ') if user.vip_expires_at else 'Active' }}</span>
-                </div>
-            </div>
-            {% else %}
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-sky-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    <span class="truncate font-medium">Reset In</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-clock text-xs sm:text-sm"></i>
-                    </div>
-                </div>
-                <div id="reset-countdown" class="text-base sm:text-2xl font-bold tracking-tight text-zinc-100 font-mono text-sky-50">
-                    --:--:--
-                </div>
-                <div class="text-[10px] sm:text-xs text-zinc-500 truncate flex items-center space-x-1">
-                    <span class="h-1.5 w-1.5 rounded-full bg-sky-400/80 inline-block shrink-0"></span>
-                    <span>00:00 ICT daily</span>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Metric 4: Priority & Latency -->
+            <!-- Metric 1: Wallet Balance -->
             <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-emerald-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
                 <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    <span class="truncate font-medium">Priority Queue</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid {% if is_vip %}fa-bolt-lightning{% else %}fa-network-wired{% endif %} text-xs sm:text-sm"></i>
+                    <span class="truncate font-medium">Wallet Balance</span>
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
+                        <i class="fa-solid fa-wallet text-xs sm:text-sm"></i>
                     </div>
                 </div>
-                <div class="text-base sm:text-2xl font-bold tracking-tight text-zinc-100">
-                    {% if is_vip %}
-                    <span class="text-emerald-400 font-semibold truncate">Fast-Track</span>
-                    {% else %}
-                    <span class="text-zinc-200 truncate">Standard</span>
-                    {% endif %}
+                <div class="min-w-0">
+                    <div class="text-base sm:text-2xl font-bold tracking-tight text-emerald-400 font-mono truncate">${{ balance | usd }}</div>
+                    <div class="text-[11px] sm:text-sm font-semibold text-emerald-300/80 font-mono truncate">≈ ฿{{ balance | thb(usd_to_thb) }}</div>
                 </div>
-                <div class="text-[10px] sm:text-xs text-zinc-500 flex items-center space-x-1.5 truncate">
-                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] {% if is_vip %}animate-pulse{% endif %}"></span>
-                    <span class="{% if is_vip %}text-emerald-400/80 font-medium{% else %}text-zinc-400{% endif %}">{% if is_vip %}Priority Routing{% else %}~45ms response{% endif %}</span>
+                <button onclick="openTopupModal()" class="text-[10px] sm:text-[11px] text-emerald-400/90 hover:text-emerald-300 flex items-center space-x-1 font-medium transition">
+                    <i class="fa-solid fa-plus text-[9px]"></i>
+                    <span>Top up · 1 USD = ฿{{ usd_to_thb | int }}</span>
+                </button>
+            </div>
+
+            <!-- Metric 2: Free Models -->
+            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-indigo-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
+                <div class="flex items-center justify-between text-[11px] sm:text-xs text-indigo-300/80">
+                    <span class="truncate font-medium">Free Models</span>
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
+                        <i class="fa-solid fa-infinity text-xs sm:text-sm"></i>
+                    </div>
                 </div>
+                <div class="text-base sm:text-2xl font-bold tracking-tight text-indigo-400 font-mono">UNLIMITED</div>
+                <div class="text-[10px] sm:text-[11px] text-zinc-500 flex items-center space-x-1">
+                    <i class="fa-solid fa-bolt text-[9px] text-indigo-400"></i>
+                    <span>{{ models|length }} models · never charged</span>
+                </div>
+            </div>
+
+            <!-- Metric 3: Total Spent -->
+            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-violet-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
+                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
+                    <span class="truncate font-medium">Premium Spent</span>
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
+                        <i class="fa-solid fa-crown text-xs sm:text-sm"></i>
+                    </div>
+                </div>
+                <div class="text-base sm:text-2xl font-bold tracking-tight text-zinc-100 font-mono truncate">${{ (user.total_spent or 0) | usd }}</div>
+                <div class="text-[10px] sm:text-[11px] text-zinc-500 truncate">xHigh usage · ฿{{ (user.total_spent or 0) | thb(usd_to_thb) }}</div>
+            </div>
+
+            <!-- Metric 4: Total Topped Up -->
+            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-cyan-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
+                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
+                    <span class="truncate font-medium">Total Topped Up</span>
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
+                        <i class="fa-solid fa-arrow-down text-xs sm:text-sm"></i>
+                    </div>
+                </div>
+                <div class="text-base sm:text-2xl font-bold tracking-tight text-zinc-100 font-mono truncate">${{ (user.total_topped_up or 0) | usd }}</div>
+                <div class="text-[10px] sm:text-[11px] text-zinc-500 truncate">Deposits · ฿{{ (user.total_topped_up or 0) | thb(usd_to_thb) }}</div>
             </div>
 
         </div>
 
-        <!-- Section: API Credentials (Clean & Minimal) -->
+        <!-- Section: API Credentials -->
         <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-5">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800/80 pb-4">
                 <div>
@@ -248,7 +179,7 @@
                         <i class="fa-solid fa-key text-zinc-400"></i>
                         <span>API Access Credentials</span>
                     </h2>
-                    <p class="text-xs text-zinc-400 mt-1">OpenAI-compatible endpoints. Configure inside Cursor, Cline, NextChat, or custom SDKs.</p>
+                    <p class="text-xs text-zinc-400 mt-1">[OI]-compatible endpoints. Configure inside Cursor, Cline, NextChat, or custom SDKs.</p>
                 </div>
                 <button onclick="regenerateKey()" class="self-start sm:self-auto py-1.5 px-3 border border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 rounded-md text-xs transition flex items-center space-x-1.5">
                     <i class="fa-solid fa-rotate text-xs"></i>
@@ -283,15 +214,119 @@
                 </div>
             </div>
         </div>
+
+        <!-- Section: xHigh Models (Premium) -->
+        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
+                <div>
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center flex-wrap gap-x-2 gap-y-1.5">
+                        <i class="fa-solid fa-crown text-violet-400"></i>
+                        <span>xHigh Models ({{ premium_models|length }})</span>
+                        <span class="normal-case tracking-normal inline-flex items-center gap-1 rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-medium text-violet-300">
+                            <i class="fa-solid fa-bolt text-[9px]"></i>Fast &amp; Stable
+                        </span>
+                    </h2>
+                    <p class="text-xs text-zinc-400 mt-1">Flagship tier — try free every day, then billed per token from your wallet.</p>
+                </div>
+                {% if any_trial_remaining %}
+                <span class="self-start sm:self-auto inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                    <i class="fa-solid fa-flask text-[10px]"></i>Free trial active
+                </span>
+                {% elif balance > 0 %}
+                <span class="self-start sm:self-auto inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                    <i class="fa-solid fa-lock-open text-[10px]"></i>Unlocked
+                </span>
+                {% else %}
+                <span class="self-start sm:self-auto inline-flex items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[11px] font-medium text-violet-300">
+                    <i class="fa-solid fa-lock text-[10px]"></i>Top up to unlock
+                </span>
+                {% endif %}
+            </div>
+
+            <!-- Premium Models Grid -->
+            <div id="premium-models-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {% for m in premium_models %}
+                <div class="premium-model-item p-4 rounded-lg bg-zinc-950/70 border border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900/40 transition group" data-model="{{ m.id }}">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="space-y-1 min-w-0">
+                            <div class="flex items-center space-x-2">
+                                <span class="h-1.5 w-1.5 rounded-full bg-violet-400 inline-block shrink-0"></span>
+                                <span class="text-xs font-mono font-medium text-zinc-100 group-hover:text-white transition truncate">{{ m.name }}</span>
+                                <span class="rounded bg-violet-500/15 text-violet-400 text-[9px] font-semibold px-1.5 py-0.5 uppercase tracking-wide shrink-0">xHigh</span>
+                            </div>
+                            <div class="text-[11px] text-zinc-500 font-mono flex items-center space-x-1.5 pl-3.5">
+                                <span class="text-zinc-400 font-medium">{{ m.provider }}</span>
+                                <span class="text-zinc-600">·</span>
+                                <span>{{ m.tag }}</span>
+                            </div>
+                        </div>
+                        <button onclick="copyModelName('{{ m.id }}', this)" class="shrink-0 p-2 text-zinc-500 hover:text-zinc-200 bg-zinc-900/60 hover:bg-zinc-800 border border-zinc-800/80 rounded-md transition" title="Copy Model ID">
+                            <i class="fa-solid fa-copy text-xs"></i>
+                        </button>
+                    </div>
+
+                    <!-- Pricing (USD per 1M tokens) -->
+                    <div class="mt-3 grid grid-cols-2 gap-2">
+                        <div class="rounded-md border border-zinc-800/70 bg-zinc-900/50 px-2.5 py-2">
+                            <div class="text-[10px] font-medium uppercase tracking-wider text-zinc-500">Input · 1M</div>
+                            <div class="text-sm font-bold font-mono text-white">${{ "%g"|format(m.price_in_usd) }}</div>
+                            <div class="text-[10px] font-mono text-zinc-600">official <span class="line-through">${{ "%.2f"|format(m.official_in_usd) }}</span></div>
+                        </div>
+                        <div class="rounded-md border border-zinc-800/70 bg-zinc-900/50 px-2.5 py-2">
+                            <div class="text-[10px] font-medium uppercase tracking-wider text-zinc-500">Output · 1M</div>
+                            <div class="text-sm font-bold font-mono text-white">${{ "%g"|format(m.price_out_usd) }}</div>
+                            <div class="text-[10px] font-mono text-zinc-600">official <span class="line-through">${{ "%.2f"|format(m.official_out_usd) }}</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Discount badge -->
+                    <div class="mt-2.5">
+                        <span class="inline-flex items-center gap-1 rounded border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400">
+                            <i class="fa-solid fa-arrow-down text-[8px]"></i>Save {{ m.discount }}%
+                        </span>
+                    </div>
+
+                    {% set tr = trial_by_model.get(m.id) %}
+                    {% if tr and tr.limit > 0 %}
+                    <!-- Daily free-trial meter (this model only) -->
+                    <div class="mt-3 pt-3 border-t border-zinc-800/70 space-y-1.5">
+                        <div class="flex items-center justify-between gap-2 text-[10px]">
+                            <span class="font-medium text-zinc-400 flex items-center gap-1">
+                                <i class="fa-solid fa-flask text-violet-400 text-[9px]"></i>
+                                Free trial today
+                            </span>
+                            <span class="font-mono text-zinc-400 whitespace-nowrap">
+                                <span class="text-zinc-100 font-semibold">{{ "{:,}".format(tr.used) }}</span>
+                                <span class="text-zinc-600"> / </span>{{ "{:,}".format(tr.limit) }}
+                            </span>
+                        </div>
+                        <div class="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                            <div class="h-1.5 rounded-full transition-all duration-300 {% if tr.remaining > 0 %}bg-gradient-to-r from-violet-500 to-violet-400{% else %}bg-amber-500{% endif %}" style="width: {{ tr.pct }}%;"></div>
+                        </div>
+                        <div class="flex items-center justify-between gap-2 text-[9px]">
+                            <span class="text-zinc-600">Resets 00:00 ICT</span>
+                            {% if tr.remaining > 0 %}
+                            <span class="text-violet-300 font-medium font-mono">{{ "{:,}".format(tr.remaining) }} left</span>
+                            {% else %}
+                            <span class="text-amber-400 font-medium">Trial used — wallet billing</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
         <!-- Section: Supported Models Catalog -->
         <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-5">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
                         <i class="fa-solid fa-layer-group text-zinc-400"></i>
-                        <span>Supported AI Models ({{ models|length }})</span>
+                        <span>Free Models ({{ models|length }})</span>
                     </h2>
-                    <p class="text-xs text-zinc-400 mt-1">Available directly via <code class="text-zinc-300 font-mono text-[11px] bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800">/v1/chat/completions</code>. Click any model ID to copy.</p>
+                    <p class="text-xs text-zinc-400 mt-1">Unlimited usage at no cost via <code class="text-zinc-300 font-mono text-[11px] bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800">/v1/chat/completions</code>. Click any model ID to copy.</p>
                 </div>
                 <!-- Search input -->
                 <div class="relative w-full sm:w-64">
@@ -308,6 +343,7 @@
                         <div class="flex items-center space-x-2">
                             <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block shrink-0"></span>
                             <span class="text-xs font-mono font-medium text-zinc-100 group-hover:text-white transition truncate select-all">{{ m }}</span>
+                            <span class="rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-semibold px-1.5 py-0.5 uppercase tracking-wide shrink-0">Free</span>
                         </div>
                         <div class="text-[11px] text-zinc-500 font-mono flex items-center space-x-1.5 pl-3.5">
                             {% if 'deepseek' in m|lower %}
@@ -318,26 +354,10 @@
                             <span class="text-zinc-400 font-medium">ZHIPU AI</span>
                             <span class="text-zinc-600">·</span>
                             <span>Bilingual Context</span>
-                            {% elif m == 'grok-4.7-xhigh' %}
-                            <span class="text-zinc-400 font-medium">xAI Grok</span>
-                            <span class="text-zinc-600">·</span>
-                            <span>Flagship Reasoning</span>
-                            {% elif m == 'grok-4.7' %}
-                            <span class="text-zinc-400 font-medium">xAI Grok</span>
-                            <span class="text-zinc-600">·</span>
-                            <span>Advanced General</span>
-                            {% elif 'qwen' in m|lower %}
-                            <span class="text-zinc-400 font-medium">Alibaba Qwen</span>
-                            <span class="text-zinc-600">·</span>
-                            <span>Math & Logic</span>
                             {% elif 'minimax' in m|lower %}
                             <span class="text-zinc-400 font-medium">MiniMax</span>
                             <span class="text-zinc-600">·</span>
                             <span>Deep Context</span>
-                            {% elif 'muse' in m|lower %}
-                            <span class="text-zinc-400 font-medium">Muse AI</span>
-                            <span class="text-zinc-600">·</span>
-                            <span>Fast Inference</span>
                             {% else %}
                             <span class="text-zinc-400 font-medium">LLM Core</span>
                             <span class="text-zinc-600">·</span>
@@ -353,9 +373,63 @@
             </div>
         </div>
 
+        <!-- Section: Wallet Activity -->
+        <div class="p-4 sm:p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+            <div class="flex items-center justify-between gap-3 border-b border-zinc-800/80 pb-3 sm:pb-4">
+                <div>
+                    <h2 class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
+                        <i class="fa-solid fa-receipt text-emerald-400"></i>
+                        <span>Wallet Activity</span>
+                    </h2>
+                    <p class="text-[11px] sm:text-xs text-zinc-400 mt-0.5">Top-ups, premium usage charges, and adjustments.</p>
+                </div>
+                <button onclick="openTopupModal()" class="py-1.5 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-md text-xs font-medium transition flex items-center space-x-1.5 shrink-0">
+                    <i class="fa-solid fa-plus text-[10px]"></i>
+                    <span>Top Up</span>
+                </button>
+            </div>
+
+            {% if wallet_tx %}
+            <div class="divide-y divide-zinc-800/60">
+                {% for t in wallet_tx %}
+                <div class="flex items-center justify-between gap-3 py-2.5">
+                    <div class="flex items-center space-x-3 min-w-0">
+                        <div class="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border
+                            {% if t.tx_type == 'topup' %}bg-emerald-500/10 border-emerald-500/25 text-emerald-400
+                            {% elif t.tx_type == 'usage' %}bg-amber-500/10 border-amber-500/25 text-amber-400
+                            {% elif t.tx_type == 'migration' %}bg-violet-500/10 border-violet-500/25 text-violet-400
+                            {% else %}bg-sky-500/10 border-sky-500/25 text-sky-400{% endif %}">
+                            <i class="fa-solid text-xs
+                                {% if t.tx_type == 'topup' %}fa-arrow-down
+                                {% elif t.tx_type == 'usage' %}fa-crown
+                                {% elif t.tx_type == 'migration' %}fa-gift
+                                {% else %}fa-sliders{% endif %}"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="text-xs font-medium text-zinc-200 truncate">{{ t.description or t.tx_type|capitalize }}</div>
+                            <div class="text-[10px] text-zinc-500 font-mono">{{ t.created_at }}</div>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <div class="text-xs font-bold font-mono whitespace-nowrap {% if t.amount_usd >= 0 %}text-emerald-400{% else %}text-zinc-300{% endif %}">
+                            {% if t.amount_usd >= 0 %}+{% endif %}${{ t.amount_usd | usd }}
+                            <span class="text-[10px] font-normal text-zinc-500">· ฿{{ t.amount_usd | thb(usd_to_thb) }}</span>
+                        </div>
+                        <div class="text-[10px] text-zinc-500 font-mono whitespace-nowrap">bal ${{ t.balance_after | usd }} · ฿{{ t.balance_after | thb(usd_to_thb) }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="py-8 text-center text-xs text-zinc-500">
+                <i class="fa-solid fa-receipt text-lg text-zinc-700 mb-2 block"></i>
+                No wallet activity yet. Top up to unlock premium models.
+            </div>
+            {% endif %}
+        </div>
+
         <!-- Section: Usage Analytics & Traffic Chart -->
         <div class="p-4 sm:p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4 sm:space-y-5">
-            <!-- Header & Timeframe Switcher -->
             <div class="flex items-center justify-between gap-3 border-b border-zinc-800/80 pb-3 sm:pb-4">
                 <div>
                     <h2 class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
@@ -364,7 +438,6 @@
                     </h2>
                     <p class="text-[11px] sm:text-xs text-zinc-400 mt-0.5">Token consumption and request traffic over time.</p>
                 </div>
-                <!-- Range Toggle Buttons -->
                 <div class="inline-flex items-center bg-zinc-950 p-0.5 sm:p-1 rounded-lg border border-zinc-800 text-xs font-medium shadow-inner shrink-0">
                     <button id="range-btn-24h" onclick="loadUsageAnalytics('24h')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-white bg-zinc-800 transition shadow-xs font-mono text-[11px] sm:text-xs">24h</button>
                     <button id="range-btn-7d" onclick="loadUsageAnalytics('7d')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 transition font-mono text-[11px] sm:text-xs">7d</button>
@@ -372,7 +445,6 @@
                 </div>
             </div>
 
-            <!-- Compact Metrics Strip (Single row on mobile & desktop) -->
             <div class="grid grid-cols-3 divide-x divide-zinc-800/80 bg-zinc-950/70 rounded-lg border border-zinc-800/80 py-2 sm:py-3 px-1 sm:px-2 shadow-inner">
                 <div class="px-2 sm:px-3 text-center sm:text-left space-y-0.5">
                     <div class="text-[10px] sm:text-[11px] font-medium text-zinc-400 uppercase tracking-wider truncate">All-Time</div>
@@ -397,7 +469,6 @@
                 </div>
             </div>
 
-            <!-- Canvas Container -->
             <div class="relative w-full h-44 sm:h-60 bg-zinc-950/40 rounded-lg p-2 sm:p-4 border border-zinc-800/70">
                 <canvas id="usageChart"></canvas>
             </div>
@@ -413,144 +484,85 @@
         </div>
     </footer>
 
-    <!-- Contact Admin / VIP Modal -->
-    <div id="vip-modal" onclick="if(event.target === this) closeVipModal()" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <!-- Top-Up Modal -->
+    <div id="topup-modal" onclick="if(event.target === this) closeTopupModal()" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
         <div class="bg-zinc-900 border border-zinc-800 max-w-md w-full rounded-2xl p-5 sm:p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto">
-            
-            <!-- STEP 1: Plan Selection View -->
-            <div id="vip-view-select" class="space-y-4">
-                <!-- Modal Header -->
+
+            <!-- STEP 1: Amount Selection -->
+            <div id="topup-view-select" class="space-y-4">
                 <div class="flex items-center justify-between border-b border-zinc-800/80 pb-3">
                     <div class="flex items-center space-x-2">
-                        <i class="fa-solid fa-crown text-amber-400 text-base"></i>
-                        <h3 class="text-sm font-semibold text-zinc-100">{% if is_vip %}ต่ออายุ Unlimited VIP{% else %}อัปเกรดเป็น Unlimited VIP{% endif %}</h3>
+                        <i class="fa-solid fa-wallet text-emerald-400 text-base"></i>
+                        <h3 class="text-sm font-semibold text-zinc-100">Top Up Wallet</h3>
                     </div>
-                    <button type="button" onclick="closeVipModal()" class="text-zinc-500 hover:text-zinc-300 text-sm p-1 rounded-md transition">
+                    <button type="button" onclick="closeTopupModal()" class="text-zinc-500 hover:text-zinc-300 text-sm p-1 rounded-md transition">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
 
-                <p class="text-xs text-zinc-400">{% if is_vip %}เลือกแพ็กเกจเพื่อต่ออายุการเป็นสมาชิก Unlimited VIP ของคุณ{% else %}เลือกแพ็กเกจ VIP เพื่อปลดล็อกโควตา Token ไม่จำกัด และสิทธิ์ Priority Routing อัตโนมัติทันที{% endif %}</p>
+                <p class="text-xs text-zinc-400">Pay in Thai Baht (PromptPay). Your balance is stored and charged in USD.</p>
 
-                {% if is_vip %}
-                <!-- Renewal Info (existing VIP) -->
-                <div class="p-3 rounded-xl bg-violet-500/10 border border-violet-500/25 space-y-1">
-                    <div class="flex items-center space-x-1.5 text-[11px] font-semibold text-violet-300">
-                        <i class="fa-solid fa-clock-rotate-left"></i>
-                        <span>วันหมดอายุปัจจุบัน: {{ user.vip_expires_at[:16].replace('T', ' ') if user.vip_expires_at else '-' }}</span>
-                    </div>
-                    <p class="text-[11px] text-violet-300/70 leading-relaxed">แพ็กเกจที่เลือกจะถูก <span class="font-medium text-violet-200">บวกต่อจากวันหมดอายุเดิม</span> โดยอัตโนมัติ ไม่รีเซ็ตเวลาที่เหลือ</p>
+                <!-- Quick picks -->
+                <div class="grid grid-cols-3 gap-2">
+                    {% for p in topup_packages %}
+                    <button type="button" onclick="selectPackage({{ p.thb }})" data-thb="{{ p.thb }}" class="topup-chip p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 transition text-center">
+                        <div class="text-sm font-bold font-mono text-zinc-100">฿{{ p.thb }}</div>
+                        <div class="text-[10px] font-mono text-emerald-400">${{ "%.2f"|format(p.usd) }}</div>
+                    </button>
+                    {% endfor %}
                 </div>
-                {% endif %}
 
-                <!-- Stacked Passes (Daily / Weekly) -->
-                <div class="space-y-3">
-                    <!-- Daily Pass -->
-                    <div class="p-3.5 sm:p-4 rounded-xl bg-zinc-950 border border-zinc-800/80 space-y-2">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Daily Pass</span>
-                            <span class="text-base font-bold font-mono text-zinc-100">฿{{ vip_daily_price }} <span class="text-xs text-zinc-500 font-normal font-sans">/ 24 ชม.</span></span>
-                        </div>
-                        <ul class="text-xs space-y-1 text-zinc-400">
-                            <li class="flex items-center space-x-2">
-                                <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                                <span>โควตา Token ไม่จำกัด 100%</span>
-                            </li>
-                            <li class="flex items-center space-x-2">
-                                <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                                <span>คิวประมวลผลด่วนพิเศษ (Priority Routing)</span>
-                            </li>
-                            <li class="flex items-center space-x-2">
-                                <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                                <span>รองรับการใช้งานทุกโมเดลตลอด 24 ชม.</span>
-                            </li>
-                        </ul>
-                        <button type="button" onclick="startVipCheckout('daily')" class="w-full mt-2 py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium rounded-lg transition flex items-center justify-center space-x-1.5 border border-zinc-700/60 shadow-xs">
-                            <i class="fa-solid fa-qrcode text-indigo-400 text-xs"></i>
-                            <span>เลือก Daily Pass (฿{{ vip_daily_price }})</span>
-                        </button>
+                <!-- Custom amount -->
+                <div class="space-y-1.5">
+                    <label class="text-xs font-medium text-zinc-400">Or enter amount (THB)</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2.5 text-zinc-500 text-sm font-mono">฿</span>
+                        <input id="topup-amount-input" type="number" min="{{ min_topup_thb | int }}" step="1" oninput="updateUsdPreview()" placeholder="{{ min_topup_thb | int }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md pl-7 pr-3 py-2 text-sm font-mono text-zinc-100 focus:outline-none focus:border-emerald-500/50">
                     </div>
-
-                    <!-- Weekly Pass -->
-                    <div class="p-3.5 sm:p-4 rounded-xl bg-zinc-950 border border-zinc-800/80 space-y-2">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Weekly Pass</span>
-                            <span class="text-base font-bold font-mono text-zinc-100">฿{{ vip_weekly_price }} <span class="text-xs text-zinc-500 font-normal font-sans">/ 7 วัน</span></span>
-                        </div>
-                        <ul class="text-xs space-y-1 text-zinc-400">
-                            <li class="flex items-center space-x-2">
-                                <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                                <span>โควตา Token ไม่จำกัด 100% ยาวนาน 7 วัน</span>
-                            </li>
-                            <li class="flex items-center space-x-2">
-                                <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                                <span>คิวประมวลผลด่วนพิเศษ (Priority Fast-Track)</span>
-                            </li>
-                            <li class="flex items-center space-x-2">
-                                <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                                <span>ประหยัดทันที ฿20 (คุ้มค่ายาวนาน 7 วันเต็ม)</span>
-                            </li>
-                        </ul>
-                        <button type="button" onclick="startVipCheckout('weekly')" class="w-full mt-2 py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium rounded-lg transition flex items-center justify-center space-x-1.5 border border-zinc-700/60 shadow-xs">
-                            <i class="fa-solid fa-qrcode text-indigo-400 text-xs"></i>
-                            <span>เลือก Weekly Pass (฿{{ vip_weekly_price }})</span>
-                        </button>
+                    <div class="flex items-center justify-between text-[11px]">
+                        <span class="text-zinc-500">Minimum ฿{{ min_topup_thb | int }}</span>
+                        <span class="text-emerald-400 font-medium">You'll receive <span id="usd-preview" class="font-mono font-bold">$0.00</span></span>
+                    </div>
+                    <div id="topup-min-warning" class="hidden text-[11px] text-rose-400 flex items-center space-x-1">
+                        <i class="fa-solid fa-circle-exclamation"></i>
+                        <span>ยอดเติมขั้นต่ำ ฿{{ min_topup_thb | int }} (≈ ${{ (min_topup_thb / usd_to_thb) | usd }})</span>
                     </div>
                 </div>
 
-                <!-- Secondary Support & Discord Link -->
-                <div class="pt-2 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-400">
-                    <span>ต้องการความช่วยเหลือ?</span>
-                    <a href="{{ discord_invite }}" target="_blank" rel="noopener noreferrer" class="text-indigo-400 hover:text-indigo-300 font-medium flex items-center space-x-1">
-                        <i class="fa-brands fa-discord"></i>
-                        <span>ติดต่อแอดมินบน Discord</span>
-                    </a>
-                </div>
+                <div class="text-[11px] text-zinc-500 text-center font-mono">Rate: 1 USD = ฿{{ usd_to_thb | int }}</div>
+
+                <button type="button" id="btn-continue-topup" onclick="startTopupCheckout()" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-xs rounded-lg transition flex items-center justify-center space-x-2 shadow-sm">
+                    <i class="fa-solid fa-qrcode"></i>
+                    <span>Continue to Payment</span>
+                </button>
             </div>
 
-            <!-- STEP 2: Checkout & Slip Upload View -->
-            <div id="vip-view-checkout" class="space-y-3.5 hidden">
-                <!-- Modal Header with Back Button -->
+            <!-- STEP 2: Checkout & Slip Upload -->
+            <div id="topup-view-checkout" class="space-y-3.5 hidden">
                 <div class="flex items-center justify-between border-b border-zinc-800/80 pb-3">
-                    <button type="button" onclick="backToVipSelect()" class="text-zinc-400 hover:text-zinc-200 text-xs flex items-center space-x-1.5 p-1 rounded-md transition">
+                    <button type="button" onclick="backToTopupSelect()" class="text-zinc-400 hover:text-zinc-200 text-xs flex items-center space-x-1.5 p-1 rounded-md transition">
                         <i class="fa-solid fa-arrow-left text-xs"></i>
-                        <span>เปลี่ยนแพ็กเกจ</span>
+                        <span>เปลี่ยนยอดเงิน</span>
                     </button>
                     <h3 class="text-xs font-semibold text-zinc-200">ชำระเงินผ่าน PromptPay</h3>
-                    <button type="button" onclick="closeVipModal()" class="text-zinc-500 hover:text-zinc-300 text-sm p-1 rounded-md transition">
+                    <button type="button" onclick="closeTopupModal()" class="text-zinc-500 hover:text-zinc-300 text-sm p-1 rounded-md transition">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
 
-                <!-- Order Summary Pill -->
+                <!-- Order Summary -->
                 <div class="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800/80">
                     <div>
-                        <div class="text-[11px] text-zinc-500 uppercase tracking-wider">แพ็กเกจที่เลือก</div>
-                        <div id="checkout-plan-name" class="text-xs font-semibold text-zinc-200">Daily Pass (24 ชั่วโมง)</div>
+                        <div class="text-[11px] text-zinc-500 uppercase tracking-wider">ยอดที่ต้องชำระ</div>
+                        <div class="text-base font-bold font-mono text-emerald-400">฿<span id="checkout-amount-display">0.00</span></div>
                     </div>
                     <div class="text-right">
-                        <div class="text-[11px] text-zinc-500 uppercase tracking-wider">ยอดที่ต้องชำระ</div>
-                        <div class="text-base font-bold font-mono text-emerald-400">฿<span id="checkout-amount-display">10.00</span></div>
+                        <div class="text-[11px] text-zinc-500 uppercase tracking-wider">เครดิตที่จะได้รับ</div>
+                        <div class="text-base font-bold font-mono text-zinc-100">$<span id="checkout-usd-display">0.00</span></div>
                     </div>
                 </div>
 
-                <!-- Renewal Preview (only shown to existing VIP) -->
-                <div id="renewal-info-box" class="hidden p-3 rounded-xl bg-violet-950/40 border border-violet-800/60 space-y-1.5">
-                    <div class="flex items-center space-x-1.5 text-[11px] font-semibold text-violet-300">
-                        <i class="fa-solid fa-clock-rotate-left"></i>
-                        <span>โหมดต่ออายุ (สะสมเวลา)</span>
-                    </div>
-                    <div class="flex items-center justify-between text-[11px]">
-                        <span class="text-violet-300/70">หมดอายุปัจจุบัน</span>
-                        <span id="renewal-current-exp" class="font-mono text-violet-200">-</span>
-                    </div>
-                    <div class="flex items-center justify-between text-[11px]">
-                        <span class="text-violet-300/70">หลังต่ออายุ (+<span id="renewal-days">1</span> วัน)</span>
-                        <span id="renewal-new-exp" class="font-mono font-semibold text-violet-300">-</span>
-                    </div>
-                </div>
-
-                <!-- QR Code Box (When PromptPay ID is present) -->
+                <!-- QR Code -->
                 <div id="qr-box-container" class="bg-white p-3.5 rounded-2xl mx-auto w-fit flex flex-col items-center shadow-lg">
                     <img id="promptpay-qr-img" src="" alt="PromptPay QR Code" class="w-[180px] h-[180px] block object-contain">
                     <div class="mt-2 text-center space-y-0.5">
@@ -566,7 +578,7 @@
                     </button>
                 </div>
 
-                <!-- Missing PromptPay ID Warning Box (If PromptPay ID is not configured) -->
+                <!-- Missing PromptPay warning -->
                 <div id="no-promptpay-box" class="hidden p-4 rounded-xl bg-amber-950/40 border border-amber-800/60 text-amber-200 text-xs text-center space-y-2.5">
                     <div class="flex items-center justify-center space-x-2 font-semibold text-amber-300">
                         <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
@@ -583,28 +595,26 @@
                     {% endif %}
                 </div>
 
-                <!-- Exact Amount Notice -->
+                <!-- Exact amount notice -->
                 <div id="exact-amount-notice" class="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-800/50 rounded-lg px-2.5 py-1.5 text-center flex items-center justify-center space-x-1.5">
                     <i class="fa-solid fa-triangle-exclamation shrink-0 text-xs text-amber-400"></i>
-                    <span>กรุณาโอนเงินยอด ฿<span id="checkout-amount-warning">10.00</span> พอดีเพื่อให้ระบบตรวจสลิปผ่าน</span>
+                    <span>กรุณาโอนเงินยอด ฿<span id="checkout-amount-warning">0.00</span> พอดีเพื่อให้ระบบตรวจสลิปผ่าน</span>
                 </div>
 
-                <!-- Slip Upload / Paste Zone -->
+                <!-- Slip Upload -->
                 <div class="space-y-1.5">
                     <label class="text-xs font-medium text-zinc-300 flex items-center justify-between">
                         <span>แนบสลิปการโอนเงิน</span>
                         <span class="text-[10px] text-zinc-500 font-normal">ตรวจสลิปอัตโนมัติ 24 ชม.</span>
                     </label>
 
-                    <!-- Dropzone -->
-                    <div id="slip-dropzone" onclick="document.getElementById('slip-file-input').click()" class="border-2 border-dashed border-zinc-700 hover:border-indigo-500 rounded-xl p-3.5 text-center cursor-pointer transition bg-zinc-950/50 hover:bg-zinc-950 group">
-                        <i class="fa-solid fa-cloud-arrow-up text-xl text-zinc-400 group-hover:text-indigo-400 mb-1 transition-colors"></i>
+                    <div id="slip-dropzone" onclick="document.getElementById('slip-file-input').click()" class="border-2 border-dashed border-zinc-700 hover:border-emerald-500 rounded-xl p-3.5 text-center cursor-pointer transition bg-zinc-950/50 hover:bg-zinc-950 group">
+                        <i class="fa-solid fa-cloud-arrow-up text-xl text-zinc-400 group-hover:text-emerald-400 mb-1 transition-colors"></i>
                         <p class="text-xs text-zinc-300 font-medium">คลิกเพื่อเลือกไฟล์ หรือกด <kbd class="px-1.5 py-0.5 bg-zinc-800 text-[10px] rounded border border-zinc-700 text-zinc-200 font-mono">Ctrl+V</kbd> เพื่อวางรูป</p>
                         <p class="text-[10px] text-zinc-500 mt-0.5">รองรับไฟล์สลิปรูปภาพ JPG, PNG (สูงสุด 10MB)</p>
                     </div>
                     <input type="file" id="slip-file-input" accept="image/*" class="hidden" onchange="handleSlipFileSelected(this)">
 
-                    <!-- Slip Preview Box -->
                     <div id="slip-preview-container" class="hidden flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800">
                         <div class="flex items-center space-x-3 overflow-hidden">
                             <img id="slip-preview-img" src="" alt="Slip Preview" class="w-10 h-10 object-cover rounded border border-zinc-700 shrink-0">
@@ -625,109 +635,39 @@
                     <span id="checkout-error-text">ข้อผิดพลาดในการตรวจสอบสลิป</span>
                 </div>
 
-                <!-- Submit Button -->
-                <button type="button" id="btn-submit-slip" onclick="submitSlipPayment()" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-xs rounded-lg transition flex items-center justify-center space-x-2 shadow-sm">
+                <button type="button" id="btn-submit-slip" onclick="submitTopupSlip()" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-xs rounded-lg transition flex items-center justify-center space-x-2 shadow-sm">
                     <i id="btn-submit-icon" class="fa-solid fa-shield-halved"></i>
                     <span id="btn-submit-text">ยืนยันและตรวจสอบสลิปอัตโนมัติ</span>
                 </button>
             </div>
 
-            <!-- STEP 3: Success View -->
-            <div id="vip-view-success" class="space-y-4 py-4 text-center hidden">
+            <!-- STEP 3: Success -->
+            <div id="topup-view-success" class="space-y-4 py-4 text-center hidden">
                 <div class="w-16 h-16 rounded-full bg-emerald-950/70 border border-emerald-800/80 flex items-center justify-center mx-auto text-emerald-400 text-2xl shadow-lg">
                     <i class="fa-solid fa-check"></i>
                 </div>
                 <div class="space-y-1">
-                    <h3 id="success-title" class="text-base font-bold text-zinc-100">{% if is_vip %}ต่ออายุ VIP สำเร็จเรียบร้อย!{% else %}อัปเกรด VIP สำเร็จเรียบร้อย!{% endif %}</h3>
-                    <p id="success-message-text" class="text-xs text-zinc-400">บัญชีของคุณได้รับการอัปเดตเป็น Unlimited VIP เรียบร้อยแล้ว</p>
+                    <h3 class="text-base font-bold text-zinc-100">เติมเงินสำเร็จเรียบร้อย!</h3>
+                    <p id="success-message-text" class="text-xs text-zinc-400">เครดิตเข้ากระเป๋าของคุณแล้ว</p>
                 </div>
                 <button type="button" onclick="window.location.reload()" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs rounded-lg transition flex items-center justify-center space-x-2 shadow-sm">
                     <i class="fa-solid fa-rotate-right"></i>
                     <span>เริ่มใช้งานทันที (รีโหลดหน้าเว็บ)</span>
                 </button>
             </div>
-            
+
         </div>
     </div>
 
     <!-- Client Scripts -->
     <script>
-        // Adaptive Countdown (VIP Expiry vs Midnight Free Reset)
-        const isVipUser = {{ 'true' if is_vip else 'false' }};
-        const vipExpiryIso = "{{ user.vip_expires_at if (is_vip and user.vip_expires_at) else '' }}";
-
-        // Format a Date as "DD/MM/YYYY HH:MM" in local time
-        function formatVipDate(dateObj) {
-            const pad = (n) => String(n).padStart(2, '0');
-            return `${pad(dateObj.getDate())}/${pad(dateObj.getMonth() + 1)}/${dateObj.getFullYear()} ${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
-        }
-
-        // Base timestamp to extend from: later of now or the current expiry (matches backend stacking)
-        function vipRenewalBase() {
-            const now = new Date();
-            if (isVipUser && vipExpiryIso) {
-                const exp = new Date(vipExpiryIso.replace(' ', 'T'));
-                if (!isNaN(exp.getTime()) && exp.getTime() > now.getTime()) {
-                    return exp;
-                }
-            }
-            return now;
-        }
-
-        function updateCountdownClock() {
-            const now = new Date();
-
-            if (isVipUser && vipExpiryIso) {
-                const expiryDate = new Date(vipExpiryIso.replace(' ', 'T'));
-                const diff = expiryDate.getTime() - now.getTime();
-                const el = document.getElementById('vip-expiry-countdown');
-                if (el) {
-                    if (diff <= 0) {
-                        el.innerText = "EXPIRED";
-                        el.className = "text-base sm:text-2xl font-bold tracking-tight text-rose-400 font-mono";
-                    } else {
-                        const totalSeconds = Math.floor(diff / 1000);
-                        const days = Math.floor(totalSeconds / 86400);
-                        const hours = Math.floor((totalSeconds % 86400) / 3600);
-                        const minutes = Math.floor((totalSeconds % 3600) / 60);
-                        const seconds = totalSeconds % 60;
-
-                        if (days > 0) {
-                            const hh = String(hours).padStart(2, '0');
-                            const mm = String(minutes).padStart(2, '0');
-                            el.innerText = `${days}d ${hh}h ${mm}m`;
-                        } else {
-                            const hh = String(hours).padStart(2, '0');
-                            const mm = String(minutes).padStart(2, '0');
-                            const ss = String(seconds).padStart(2, '0');
-                            el.innerText = `${hh}:${mm}:${ss}`;
-                        }
-                    }
-                }
-            } else {
-                const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
-                const diff = tomorrow - now;
-                const hours = String(Math.floor((diff / (1000 * 60 * 60)) % 24)).padStart(2, '0');
-                const minutes = String(Math.floor((diff / 1000 / 60) % 60)).padStart(2, '0');
-                const seconds = String(Math.floor((diff / 1000) % 60)).padStart(2, '0');
-                
-                const el = document.getElementById('reset-countdown');
-                if (el) el.innerText = `${hours}:${minutes}:${seconds}`;
-            }
-        }
-        setInterval(updateCountdownClock, 1000);
-        updateCountdownClock();
-
-        // Universal Copy Helper (Compatible with Mobile iOS Safari, Android, HTTP & HTTPS)
+        // ─── Copy helpers ───
         function copyTextUniversal(text, successCallback) {
             if (!text) return;
-
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(text).then(() => {
                     if (successCallback) successCallback();
-                }).catch(() => {
-                    executeFallbackCopy(text, successCallback);
-                });
+                }).catch(() => executeFallbackCopy(text, successCallback));
             } else {
                 executeFallbackCopy(text, successCallback);
             }
@@ -740,58 +680,43 @@
             el.style.position = 'fixed';
             el.style.left = '-9999px';
             el.style.top = (window.pageYOffset || document.documentElement.scrollTop) + 'px';
-            el.style.fontSize = '16px'; // Prevent auto-zoom on mobile iOS
+            el.style.fontSize = '16px';
             document.body.appendChild(el);
-
             el.focus();
             el.select();
             el.setSelectionRange(0, text.length);
-
             let copied = false;
-            try {
-                copied = document.execCommand('copy');
-            } catch (err) {
-                copied = false;
-            }
+            try { copied = document.execCommand('copy'); } catch (err) { copied = false; }
             document.body.removeChild(el);
-
             if (copied) {
                 if (successCallback) successCallback();
             } else {
-                // If browser strictly blocks background clipboard, use standard prompt as 100% reliable fallback
                 window.prompt("แตะค้างแล้วกด 'คัดลอก' (Copy):", text);
                 if (successCallback) successCallback();
             }
         }
 
-        // Copy Input Field Value
         function copyToClipboard(elementId, btn) {
             const input = document.getElementById(elementId);
-            const val = input.value;
-            copyTextUniversal(val, () => {
+            copyTextUniversal(input.value, () => {
                 const origHtml = btn.innerHTML;
                 btn.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i>';
-                setTimeout(() => {
-                    btn.innerHTML = origHtml;
-                }, 1500);
+                setTimeout(() => { btn.innerHTML = origHtml; }, 1500);
             });
         }
 
-        // Copy Model Name
         function copyModelName(modelName, btn) {
             copyTextUniversal(modelName, () => {
                 const origHtml = btn.innerHTML;
                 btn.innerHTML = '<i class="fa-solid fa-check text-emerald-400 text-xs"></i>';
-                setTimeout(() => {
-                    btn.innerHTML = origHtml;
-                }, 1200);
+                setTimeout(() => { btn.innerHTML = origHtml; }, 1200);
             });
         }
 
-        // Filter Models
+        // ─── Filter models ───
         function filterModels() {
             const query = document.getElementById('model-search').value.toLowerCase().trim();
-            document.querySelectorAll('.model-item').forEach(item => {
+            document.querySelectorAll('#models-grid .model-item').forEach(item => {
                 const model = (item.getAttribute('data-model') || '').toLowerCase();
                 const text = item.textContent.toLowerCase();
                 if (!query || model.includes(query) || text.includes(query)) {
@@ -802,7 +727,7 @@
             });
         }
 
-        // Toggle Key Visibility
+        // ─── Key visibility / regenerate ───
         function toggleKeyVisibility() {
             const input = document.getElementById('api-key-input');
             const icon = document.getElementById('eye-icon');
@@ -818,7 +743,6 @@
             }
         }
 
-        // Regenerate Key
         async function regenerateKey() {
             if (!confirm('Are you sure you want to regenerate your API key? Your old key will stop working immediately.')) return;
             const res = await fetch('/api/user/regenerate-key', { method: 'POST' });
@@ -829,59 +753,41 @@
             }
         }
 
-        // Usage Analytics Chart
+        // ─── Usage analytics chart ───
         let usageChartInstance = null;
         let activeAnalyticsData = {{ analytics | tojson }};
 
         function renderUsageChart(data) {
             const ctx = document.getElementById('usageChart');
             if (!ctx) return;
-
-            if (usageChartInstance) {
-                usageChartInstance.destroy();
-            }
-
+            if (usageChartInstance) usageChartInstance.destroy();
             const chartCtx = ctx.getContext('2d');
-            
-            // Subtle cyan gradient for bars
             const gradient = chartCtx.createLinearGradient(0, 0, 0, 180);
-            gradient.addColorStop(0, 'rgba(34, 211, 238, 0.9)'); // cyan-400
-            gradient.addColorStop(1, 'rgba(8, 145, 178, 0.65)'); // cyan-600
-
+            gradient.addColorStop(0, 'rgba(34, 211, 238, 0.9)');
+            gradient.addColorStop(1, 'rgba(8, 145, 178, 0.65)');
             usageChartInstance = new Chart(chartCtx, {
                 type: 'bar',
                 data: {
                     labels: data.labels,
-                    datasets: [
-                        {
-                            label: 'Tokens Used',
-                            data: data.tokens,
-                            backgroundColor: gradient,
-                            hoverBackgroundColor: '#38bdf8',
-                            borderRadius: 4,
-                            borderSkipped: false,
-                            maxBarThickness: data.labels.length > 20 ? 10 : 26
-                        }
-                    ]
+                    datasets: [{
+                        label: 'Tokens Used',
+                        data: data.tokens,
+                        backgroundColor: gradient,
+                        hoverBackgroundColor: '#38bdf8',
+                        borderRadius: 4,
+                        borderSkipped: false,
+                        maxBarThickness: data.labels.length > 20 ? 10 : 26
+                    }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
-                    },
+                    interaction: { mode: 'index', intersect: false },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
-                            backgroundColor: '#18181b',
-                            titleColor: '#f4f4f5',
-                            bodyColor: '#a1a1aa',
-                            borderColor: '#27272a',
-                            borderWidth: 1,
-                            padding: 8,
-                            cornerRadius: 6,
-                            displayColors: false,
+                            backgroundColor: '#18181b', titleColor: '#f4f4f5', bodyColor: '#a1a1aa',
+                            borderColor: '#27272a', borderWidth: 1, padding: 8, cornerRadius: 6, displayColors: false,
                             titleFont: { family: 'ui-monospace, monospace', size: 11, weight: 'bold' },
                             bodyFont: { family: 'ui-monospace, monospace', size: 11 },
                             callbacks: {
@@ -889,37 +795,21 @@
                                     const idx = context.dataIndex;
                                     const tokens = (data.tokens && data.tokens[idx] !== undefined) ? data.tokens[idx] : 0;
                                     const reqs = (data.requests && data.requests[idx] !== undefined) ? data.requests[idx] : 0;
-                                    return [
-                                        `Tokens: ${tokens.toLocaleString()}`,
-                                        `Requests: ${reqs.toLocaleString()}`
-                                    ];
+                                    return [`Tokens: ${tokens.toLocaleString()}`, `Requests: ${reqs.toLocaleString()}`];
                                 }
                             }
                         }
                     },
                     scales: {
                         x: {
-                            grid: {
-                                display: false
-                            },
-                            ticks: {
-                                color: '#71717a',
-                                maxRotation: 0,
-                                autoSkip: true,
-                                maxTicksLimit: 7,
-                                font: { family: 'ui-monospace, monospace', size: 10 }
-                            }
+                            grid: { display: false },
+                            ticks: { color: '#71717a', maxRotation: 0, autoSkip: true, maxTicksLimit: 7, font: { family: 'ui-monospace, monospace', size: 10 } }
                         },
                         y: {
                             beginAtZero: true,
-                            grid: {
-                                color: 'rgba(39, 39, 42, 0.4)',
-                                drawBorder: false
-                            },
+                            grid: { color: 'rgba(39, 39, 42, 0.4)', drawBorder: false },
                             ticks: {
-                                color: '#71717a',
-                                maxTicksLimit: 5,
-                                font: { family: 'ui-monospace, monospace', size: 10 },
+                                color: '#71717a', maxTicksLimit: 5, font: { family: 'ui-monospace, monospace', size: 10 },
                                 callback: function(val) {
                                     if (val === 0) return '0';
                                     if (val >= 1000000) return (val / 1000000).toFixed(val % 1000000 === 0 ? 0 : 1) + 'M';
@@ -937,22 +827,14 @@
             ['24h', '7d', '30d'].forEach(r => {
                 const btn = document.getElementById(`range-btn-${r}`);
                 if (btn) {
-                    if (r === range) {
-                        btn.className = 'px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-white bg-zinc-800 transition shadow-xs font-mono text-[11px] sm:text-xs';
-                    } else {
-                        btn.className = 'px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 transition font-mono text-[11px] sm:text-xs';
-                    }
+                    btn.className = (r === range)
+                        ? 'px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-white bg-zinc-800 transition shadow-xs font-mono text-[11px] sm:text-xs'
+                        : 'px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 transition font-mono text-[11px] sm:text-xs';
                 }
             });
-
-            const labelMap = {
-                '24h': 'Last 24h',
-                '7d': 'Last 7 Days',
-                '30d': 'Last 30 Days'
-            };
+            const labelMap = { '24h': 'Last 24h', '7d': 'Last 7 Days', '30d': 'Last 30 Days' };
             const periodLabel = document.getElementById('stat-period-label');
             if (periodLabel) periodLabel.textContent = labelMap[range] || 'In Period';
-
             try {
                 const res = await fetch(`/api/user/analytics?range=${range}`);
                 const json = await res.json();
@@ -971,94 +853,86 @@
             }
         }
 
-        // Initialize chart on page load
         document.addEventListener('DOMContentLoaded', () => {
             renderUsageChart(activeAnalyticsData);
         });
 
-        // VIP Modal & SlipOK Payment Controls
-        let currentPassType = 'daily';
+        // ─── Top-up modal ───
+        const USD_TO_THB = {{ usd_to_thb }};
+        const MIN_TOPUP_THB = {{ min_topup_thb }};
+        let currentAmountThb = 0;
         let currentSlipFile = null;
 
-        function openVipModal() {
-            backToVipSelect();
-            document.getElementById('vip-modal').classList.remove('hidden');
+        function openTopupModal() {
+            backToTopupSelect();
+            updateUsdPreview();
+            document.getElementById('topup-modal').classList.remove('hidden');
         }
 
-        function closeVipModal() {
-            document.getElementById('vip-modal').classList.add('hidden');
+        function closeTopupModal() {
+            document.getElementById('topup-modal').classList.add('hidden');
             removeSelectedSlip();
             hideCheckoutError();
         }
 
-        function backToVipSelect() {
-            const selectView = document.getElementById('vip-view-select');
-            const checkoutView = document.getElementById('vip-view-checkout');
-            const successView = document.getElementById('vip-view-success');
+        function backToTopupSelect() {
+            const selectView = document.getElementById('topup-view-select');
+            const checkoutView = document.getElementById('topup-view-checkout');
+            const successView = document.getElementById('topup-view-success');
             if (selectView) selectView.classList.remove('hidden');
             if (checkoutView) checkoutView.classList.add('hidden');
             if (successView) successView.classList.add('hidden');
             hideCheckoutError();
         }
 
-        async function startVipCheckout(passType) {
-            currentPassType = passType;
+        function selectPackage(thb) {
+            document.getElementById('topup-amount-input').value = thb;
+            document.querySelectorAll('.topup-chip').forEach(chip => {
+                const match = Number(chip.getAttribute('data-thb')) === Number(thb);
+                chip.classList.toggle('border-emerald-500/60', match);
+                chip.classList.toggle('bg-emerald-500/10', match);
+                chip.classList.toggle('border-zinc-800', !match);
+            });
+            updateUsdPreview();
+        }
+
+        function updateUsdPreview() {
+            const thb = parseFloat(document.getElementById('topup-amount-input').value) || 0;
+            const usd = USD_TO_THB > 0 ? (thb / USD_TO_THB) : 0;
+            document.getElementById('usd-preview').textContent = '$' + usd.toFixed(2);
+            const warning = document.getElementById('topup-min-warning');
+            const btn = document.getElementById('btn-continue-topup');
+            const belowMin = thb > 0 && thb < MIN_TOPUP_THB;
+            if (warning) warning.classList.toggle('hidden', !belowMin);
+            if (btn) btn.disabled = !(thb >= MIN_TOPUP_THB);
+        }
+
+        async function startTopupCheckout() {
+            const thb = parseFloat(document.getElementById('topup-amount-input').value) || 0;
+            if (thb < MIN_TOPUP_THB) {
+                updateUsdPreview();
+                return;
+            }
+            currentAmountThb = thb;
             hideCheckoutError();
             removeSelectedSlip();
 
             try {
-                const res = await fetch(`/api/payment/promptpay-info?pass_type=${passType}`);
+                const res = await fetch(`/api/payment/promptpay-info?amount=${thb}`);
                 const data = await res.json();
-                if (data.status !== 'ok') {
-                    alert('เกิดข้อผิดพลาดในการโหลดข้อมูลพร้อมเพย์');
+                if (!res.ok || data.status !== 'ok') {
+                    alert(data.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูลพร้อมเพย์');
                     return;
                 }
 
-                // Update summary texts
-                const planNameEl = document.getElementById('checkout-plan-name');
-                if (planNameEl) planNameEl.textContent = data.title;
-
-                const formattedAmt = Number(data.amount).toFixed(2);
-                const amtDisplayEl = document.getElementById('checkout-amount-display');
-                if (amtDisplayEl) amtDisplayEl.textContent = formattedAmt;
-
-                const amtWarningEl = document.getElementById('checkout-amount-warning');
-                if (amtWarningEl) amtWarningEl.textContent = formattedAmt;
-
-                if (data.promptpay_id) {
-                    const ppEl = document.getElementById('checkout-promptpay-id');
-                    if (ppEl) ppEl.textContent = data.promptpay_id;
-                }
-
+                const amtThb = Number(data.amount_thb).toFixed(2);
+                document.getElementById('checkout-amount-display').textContent = amtThb;
+                document.getElementById('checkout-amount-warning').textContent = amtThb;
+                document.getElementById('checkout-usd-display').textContent = Number(data.amount_usd).toFixed(2);
                 if (data.promptpay_name) {
-                    const nameEl = document.getElementById('checkout-promptpay-name');
-                    if (nameEl) nameEl.textContent = data.promptpay_name;
+                    document.getElementById('checkout-promptpay-name').textContent = data.promptpay_name;
                 }
 
-                // Renewal preview (only for existing VIP): show current expiry and the extended date
-                const renewalBox = document.getElementById('renewal-info-box');
-                if (renewalBox) {
-                    if (isVipUser) {
-                        const base = vipRenewalBase();
-                        const days = Number(data.days) || 0;
-                        const newExp = new Date(base.getTime() + days * 86400000);
-
-                        const curEl = document.getElementById('renewal-current-exp');
-                        if (curEl) curEl.textContent = vipExpiryIso ? formatVipDate(base) : 'ไม่มี (เริ่มใหม่)';
-
-                        const daysEl = document.getElementById('renewal-days');
-                        if (daysEl) daysEl.textContent = days;
-
-                        const newEl = document.getElementById('renewal-new-exp');
-                        if (newEl) newEl.textContent = formatVipDate(newExp);
-
-                        renewalBox.classList.remove('hidden');
-                    } else {
-                        renewalBox.classList.add('hidden');
-                    }
-                }
-
-                // Update QR code & PromptPay view
                 const qrImg = document.getElementById('promptpay-qr-img');
                 const qrBox = document.getElementById('qr-box-container');
                 const noPpBox = document.getElementById('no-promptpay-box');
@@ -1075,10 +949,9 @@
                     if (exactNotice) exactNotice.classList.add('hidden');
                 }
 
-                // Switch views
-                document.getElementById('vip-view-select').classList.add('hidden');
-                document.getElementById('vip-view-checkout').classList.remove('hidden');
-                document.getElementById('vip-view-success').classList.add('hidden');
+                document.getElementById('topup-view-select').classList.add('hidden');
+                document.getElementById('topup-view-checkout').classList.remove('hidden');
+                document.getElementById('topup-view-success').classList.add('hidden');
             } catch (err) {
                 console.error('Failed to load PromptPay QR:', err);
                 alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้ง');
@@ -1090,7 +963,7 @@
             if (!img || !img.src) return;
             const a = document.createElement('a');
             a.href = img.src;
-            a.download = `promptpay-qr-${currentPassType}.png`;
+            a.download = `promptpay-topup-${currentAmountThb}.png`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1106,11 +979,9 @@
                 showCheckoutError('ขนาดไฟล์รูปภาพสลิปใหญ่เกิน 10MB');
                 return;
             }
-
             currentSlipFile = file;
             hideCheckoutError();
 
-            // Preview image
             const reader = new FileReader();
             reader.onload = (e) => {
                 const previewImg = document.getElementById('slip-preview-img');
@@ -1118,23 +989,17 @@
             };
             reader.readAsDataURL(file);
 
-            // Preview info
             const nameEl = document.getElementById('slip-preview-name');
             const sizeEl = document.getElementById('slip-preview-size');
             if (nameEl) nameEl.textContent = file.name;
-            if (sizeEl) {
-                const sizeKb = (file.size / 1024).toFixed(1);
-                sizeEl.textContent = `${sizeKb} KB`;
-            }
+            if (sizeEl) sizeEl.textContent = `${(file.size / 1024).toFixed(1)} KB`;
 
             document.getElementById('slip-dropzone').classList.add('hidden');
             document.getElementById('slip-preview-container').classList.remove('hidden');
         }
 
         function handleSlipFileSelected(input) {
-            if (input.files && input.files[0]) {
-                setSlipFile(input.files[0]);
-            }
+            if (input.files && input.files[0]) setSlipFile(input.files[0]);
         }
 
         function removeSelectedSlip() {
@@ -1161,50 +1026,37 @@
             if (banner) banner.classList.add('hidden');
         }
 
-        async function submitSlipPayment() {
+        async function submitTopupSlip() {
             if (!currentSlipFile) {
                 showCheckoutError('กรุณาเลือกไฟล์หรือวางรูปภาพสลิปก่อนดำเนินการต่อ');
                 return;
             }
-
             hideCheckoutError();
             const btn = document.getElementById('btn-submit-slip');
             const icon = document.getElementById('btn-submit-icon');
             const text = document.getElementById('btn-submit-text');
 
-            // Set loading state
             btn.disabled = true;
             if (icon) icon.className = 'fa-solid fa-spinner fa-spin';
             if (text) text.textContent = 'กำลังตรวจสอบสลิปกับระบบ SlipOK...';
 
             const formData = new FormData();
-            formData.append('pass_type', currentPassType);
+            formData.append('amount', currentAmountThb);
             formData.append('slip', currentSlipFile);
 
             try {
-                const res = await fetch('/api/payment/verify-slip', {
-                    method: 'POST',
-                    body: formData
-                });
+                const res = await fetch('/api/payment/verify-slip', { method: 'POST', body: formData });
                 const data = await res.json();
-
                 if (!res.ok || data.status !== 'ok') {
                     throw new Error(data.message || 'การตรวจสอบสลิปไม่สำเร็จ');
                 }
 
-                // Show success view
-                document.getElementById('vip-view-checkout').classList.add('hidden');
-                document.getElementById('vip-view-success').classList.remove('hidden');
-                const succTitle = document.getElementById('success-title');
-                if (succTitle) succTitle.textContent = data.renewal ? 'ต่ออายุ VIP สำเร็จเรียบร้อย!' : 'อัปเกรด VIP สำเร็จเรียบร้อย!';
+                document.getElementById('topup-view-checkout').classList.add('hidden');
+                document.getElementById('topup-view-success').classList.remove('hidden');
                 const succText = document.getElementById('success-message-text');
                 if (succText && data.message) succText.textContent = data.message;
 
-                // Auto reload after 2.5 seconds
-                setTimeout(() => {
-                    window.location.reload();
-                }, 2500);
-
+                setTimeout(() => { window.location.reload(); }, 2500);
             } catch (err) {
                 showCheckoutError(err.message || 'เกิดข้อผิดพลาดในการตรวจสอบสลิป');
             } finally {
@@ -1214,21 +1066,18 @@
             }
         }
 
-        // Global Paste Listener (Ctrl+V) for slip uploads
+        // Global paste listener (Ctrl+V) for slip uploads
         window.addEventListener('paste', (e) => {
-            const modal = document.getElementById('vip-modal');
-            const checkoutView = document.getElementById('vip-view-checkout');
-            if (!modal || modal.classList.contains('hidden') || !checkoutView || checkoutView.classList.contains('hidden')) {
-                return;
-            }
+            const modal = document.getElementById('topup-modal');
+            const checkoutView = document.getElementById('topup-view-checkout');
+            if (!modal || modal.classList.contains('hidden') || !checkoutView || checkoutView.classList.contains('hidden')) return;
             if (e.clipboardData && e.clipboardData.items) {
                 for (let i = 0; i < e.clipboardData.items.length; i++) {
                     const item = e.clipboardData.items[i];
                     if (item.type.indexOf('image') !== -1) {
                         const blob = item.getAsFile();
                         if (blob) {
-                            const file = new File([blob], `slip-paste-${Date.now()}.png`, { type: blob.type });
-                            setSlipFile(file);
+                            setSlipFile(new File([blob], `slip-paste-${Date.now()}.png`, { type: blob.type }));
                             break;
                         }
                     }
@@ -1236,32 +1085,28 @@
             }
         });
 
-        // Close modal on Escape key
+        // Close modal on Escape
         window.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                const modal = document.getElementById('vip-modal');
-                if (modal && !modal.classList.contains('hidden')) {
-                    closeVipModal();
-                }
+                const modal = document.getElementById('topup-modal');
+                if (modal && !modal.classList.contains('hidden')) closeTopupModal();
             }
         });
 
-        // Setup Drag & Drop on dropzone
+        // Drag & drop on dropzone
         document.addEventListener('DOMContentLoaded', () => {
             const dropzone = document.getElementById('slip-dropzone');
             if (dropzone) {
                 ['dragenter', 'dragover'].forEach(name => {
                     dropzone.addEventListener(name, (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        dropzone.classList.add('border-indigo-500', 'bg-zinc-900');
+                        e.preventDefault(); e.stopPropagation();
+                        dropzone.classList.add('border-emerald-500', 'bg-zinc-900');
                     }, false);
                 });
                 ['dragleave', 'drop'].forEach(name => {
                     dropzone.addEventListener(name, (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        dropzone.classList.remove('border-indigo-500', 'bg-zinc-900');
+                        e.preventDefault(); e.stopPropagation();
+                        dropzone.classList.remove('border-emerald-500', 'bg-zinc-900');
                     }, false);
                 });
                 dropzone.addEventListener('drop', (e) => {

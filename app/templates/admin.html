@@ -39,7 +39,7 @@
 
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
-        <!-- Stats Overview (2 cols on Mobile, 3 on Desktop) -->
+        <!-- Stats Overview -->
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-indigo-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
                 <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
@@ -51,14 +51,24 @@
                 <div class="text-lg sm:text-2xl font-bold font-mono text-zinc-100">{{ stats.total_users }}</div>
             </div>
 
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-cyan-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
+            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-emerald-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
                 <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    <span class="truncate font-medium">Active VIP</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
+                    <span class="truncate font-medium">Wallet Liability</span>
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
+                        <i class="fa-solid fa-wallet text-xs sm:text-sm"></i>
+                    </div>
+                </div>
+                <div class="text-base sm:text-2xl font-bold font-mono text-emerald-400 truncate">${{ stats.total_balance | usd }}</div>
+            </div>
+
+            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-amber-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
+                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
+                    <span class="truncate font-medium">Premium Revenue</span>
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
                         <i class="fa-solid fa-crown text-xs sm:text-sm"></i>
                     </div>
                 </div>
-                <div class="text-lg sm:text-2xl font-bold font-mono text-cyan-400">{{ stats.total_vip }}</div>
+                <div class="text-base sm:text-2xl font-bold font-mono text-amber-300 truncate">${{ stats.total_spent | usd }}</div>
             </div>
 
             <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-sky-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
@@ -89,16 +99,6 @@
                     </div>
                 </div>
                 <div class="text-base sm:text-2xl font-bold font-mono text-violet-300 truncate">{{ "{:,}".format(stats.all_time_tokens) }}</div>
-            </div>
-
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-amber-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    <span class="truncate font-medium">Avg / Active Day</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-calculator text-xs sm:text-sm"></i>
-                    </div>
-                </div>
-                <div class="text-base sm:text-2xl font-bold font-mono text-amber-300 truncate">{{ "{:,}".format(stats.avg_per_day) }}</div>
             </div>
         </div>
 
@@ -160,8 +160,23 @@
 
             <form action="/api/admin/settings" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1">
-                    <label class="text-xs font-medium text-zinc-400">Daily Free Tokens Quota</label>
-                    <input type="number" name="daily_free_tokens" value="{{ settings.daily_free_tokens }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                    <label class="text-xs font-medium text-zinc-400">USD → THB Rate (1 USD = ? THB)</label>
+                    <input type="number" step="0.01" name="usd_to_thb" value="{{ settings.usd_to_thb }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">Minimum Top-Up (THB)</label>
+                    <input type="number" step="1" name="min_topup_thb" value="{{ settings.min_topup_thb }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1 md:col-span-2">
+                    <label class="text-xs font-medium text-zinc-400">Top-Up Quick Picks (THB, comma separated)</label>
+                    <input type="text" name="topup_packages_thb" value="{{ settings.topup_packages_thb }}" placeholder="10,35,70,175,350,700" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1 md:col-span-2">
+                    <label class="text-xs font-medium text-zinc-400">Default Premium Free Trial (tokens / day / model)</label>
+                    <input type="number" step="1000" name="premium_trial_tokens_per_day" value="{{ settings.premium_trial_tokens_per_day }}" placeholder="1000000" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
                 </div>
 
                 <div class="space-y-1">
@@ -174,19 +189,9 @@
                     <input type="password" name="master_router_key" value="{{ settings.master_router_key }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
                 </div>
 
-                <div class="space-y-1">
+                <div class="space-y-1 md:col-span-2">
                     <label class="text-xs font-medium text-zinc-400">Discord Contact / Support Invite URL</label>
                     <input type="text" name="discord_invite_url" value="{{ settings.discord_invite_url }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
-                </div>
-
-                <div class="space-y-1">
-                    <label class="text-xs font-medium text-zinc-400">VIP Daily Price (THB)</label>
-                    <input type="number" name="vip_daily_price" value="{{ settings.vip_daily_price }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
-                </div>
-
-                <div class="space-y-1">
-                    <label class="text-xs font-medium text-zinc-400">VIP Weekly Price (THB)</label>
-                    <input type="number" name="vip_weekly_price" value="{{ settings.vip_weekly_price }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
                 </div>
 
                 <div class="space-y-1">
@@ -217,27 +222,27 @@
             </form>
         </div>
 
-        <!-- Section: User Management Table -->
+        <!-- Section: User Management -->
         <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-6">
             <div class="flex items-center justify-between border-b border-zinc-800/80 pb-4">
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
                         <i class="fa-solid fa-users-gear text-zinc-400"></i>
-                        <span>User Accounts & Subscriptions</span>
+                        <span>User Accounts & Wallets</span>
                     </h2>
-                    <p class="text-xs text-zinc-400 mt-1">Manage tiers, grant VIP passes, reset quotas, and control access.</p>
+                    <p class="text-xs text-zinc-400 mt-1">Adjust balances, reset usage, and control access.</p>
                 </div>
             </div>
 
-            <!-- Table -->
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs">
                     <thead class="text-zinc-500 uppercase tracking-wider border-b border-zinc-800 font-mono text-[11px]">
                         <tr>
                             <th class="py-3 px-3">User</th>
-                            <th class="py-3 px-3">Tier</th>
-                            <th class="py-3 px-3">Today Usage <span class="text-zinc-600 normal-case" title="Free: daily quota used (cleared by Reset Quota). VIP: real usage today."><i class="fa-solid fa-circle-info text-[10px]"></i></span></th>
-                            <th class="py-3 px-3">VIP Expiry</th>
+                            <th class="py-3 px-3">Balance (USD)</th>
+                            <th class="py-3 px-3">Topped Up</th>
+                            <th class="py-3 px-3">Spent</th>
+                            <th class="py-3 px-3">Today Usage</th>
                             <th class="py-3 px-3">Status</th>
                             <th class="py-3 px-3 text-right">Actions</th>
                         </tr>
@@ -254,19 +259,10 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="py-3 px-3">
-                                {% if u.tier == 'vip' %}
-                                <span class="px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 font-semibold font-mono text-[10px]">VIP</span>
-                                {% else %}
-                                <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono text-[10px]">FREE</span>
-                                {% endif %}
-                            </td>
-                            <td class="py-3 px-3 font-mono text-zinc-300">
-                                {{ "{:,}".format(u.today_tokens) }}
-                            </td>
-                            <td class="py-3 px-3 font-mono text-zinc-400">
-                                {{ u.vip_expires_at[:16].replace('T', ' ') if u.vip_expires_at else '-' }}
-                            </td>
+                            <td class="py-3 px-3 font-mono font-bold text-emerald-400">${{ u.balance | usd }}</td>
+                            <td class="py-3 px-3 font-mono text-zinc-300">${{ u.total_topped_up | usd }}</td>
+                            <td class="py-3 px-3 font-mono text-amber-300">${{ u.total_spent | usd }}</td>
+                            <td class="py-3 px-3 font-mono text-zinc-300">{{ "{:,}".format(u.today_tokens) }}</td>
                             <td class="py-3 px-3">
                                 {% if u.is_banned %}
                                 <span class="text-rose-400 font-medium">Suspended</span>
@@ -275,12 +271,7 @@
                                 {% endif %}
                             </td>
                             <td class="py-3 px-3 text-right space-x-1.5 whitespace-nowrap">
-                                <button onclick="upgradeVip('{{ u.id }}', 1)" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-[11px] transition">+1d VIP</button>
-                                <button onclick="upgradeVip('{{ u.id }}', 7)" class="px-2 py-1 rounded bg-indigo-900/40 hover:bg-indigo-800/50 text-indigo-300 border border-indigo-700 text-[11px] transition">+7d VIP</button>
-                                {% if u.tier == 'vip' %}
-                                <button onclick="revokeVip('{{ u.id }}')" class="px-2 py-1 rounded bg-violet-900/40 hover:bg-violet-800/50 text-violet-300 border border-violet-700 text-[11px] transition font-medium" title="Cancel/Reset VIP to Free">Revoke VIP</button>
-                                {% endif %}
-                                <button onclick="resetQuota('{{ u.id }}')" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border border-zinc-700 text-[11px] transition" title="Reset Today's Tokens"><i class="fa-solid fa-rotate-left"></i></button>
+                                <button onclick="adjustBalance('{{ u.id }}', '{{ u.username }}')" class="px-2 py-1 rounded bg-emerald-900/30 hover:bg-emerald-800/50 text-emerald-300 border border-emerald-800 text-[11px] transition" title="Add or subtract USD balance">Adjust $</button>
                                 <button onclick="toggleBan('{{ u.id }}')" class="px-2 py-1 rounded {% if u.is_banned %}bg-emerald-900/30 text-emerald-300 border-emerald-800{% else %}bg-rose-900/30 text-rose-300 border-rose-800{% endif %} border text-[11px] transition">
                                     {% if u.is_banned %}Unban{% else %}Ban{% endif %}
                                 </button>
@@ -293,15 +284,15 @@
             </div>
         </div>
 
-        <!-- Section: Recent Payment Transactions -->
+        <!-- Section: Wallet Ledger -->
         <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
             <div class="flex items-center justify-between border-b border-zinc-800/80 pb-4">
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
                         <i class="fa-solid fa-receipt text-emerald-400"></i>
-                        <span>Recent VIP Payments (SlipOK)</span>
+                        <span>Wallet Ledger</span>
                     </h2>
-                    <p class="text-xs text-zinc-400 mt-1">Transaction history and verified bank slips.</p>
+                    <p class="text-xs text-zinc-400 mt-1">Every top-up, premium charge, and adjustment (USD).</p>
                 </div>
             </div>
 
@@ -310,8 +301,60 @@
                     <thead>
                         <tr class="border-b border-zinc-800 text-[11px] text-zinc-400 uppercase tracking-wider font-semibold">
                             <th class="py-2.5 px-3">User</th>
-                            <th class="py-2.5 px-3">Pass Type</th>
+                            <th class="py-2.5 px-3">Type</th>
                             <th class="py-2.5 px-3">Amount</th>
+                            <th class="py-2.5 px-3">Balance After</th>
+                            <th class="py-2.5 px-3">Detail</th>
+                            <th class="py-2.5 px-3">Time</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-800/60 text-zinc-300">
+                        {% for t in wallet_tx %}
+                        <tr class="hover:bg-zinc-850/30 transition">
+                            <td class="py-2.5 px-3 flex items-center space-x-2">
+                                <img src="{{ t.avatar_url or 'https://cdn.discordapp.com/embed/avatars/0.png' }}" class="w-5 h-5 rounded-full">
+                                <span class="font-medium text-zinc-200">{{ t.username or t.user_id }}</span>
+                            </td>
+                            <td class="py-2.5 px-3 uppercase text-[11px] font-semibold
+                                {% if t.tx_type == 'topup' %}text-emerald-400
+                                {% elif t.tx_type == 'usage' %}text-amber-400
+                                {% elif t.tx_type == 'migration' %}text-violet-400
+                                {% else %}text-sky-400{% endif %}">{{ t.tx_type }}</td>
+                            <td class="py-2.5 px-3 font-mono font-bold {% if t.amount_usd >= 0 %}text-emerald-400{% else %}text-zinc-300{% endif %}">
+                                {% if t.amount_usd >= 0 %}+{% endif %}${{ t.amount_usd | usd }}
+                            </td>
+                            <td class="py-2.5 px-3 font-mono text-zinc-400">${{ t.balance_after | usd }}</td>
+                            <td class="py-2.5 px-3 text-[11px] text-zinc-400">{{ t.description }}{% if t.model %} · <span class="font-mono text-zinc-500">{{ t.model }}</span>{% endif %}</td>
+                            <td class="py-2.5 px-3 text-zinc-500 font-mono text-[11px]">{{ t.created_at }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="py-6 text-center text-zinc-500">No wallet activity recorded yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section: Recent Top-up Transactions -->
+        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+            <div class="flex items-center justify-between border-b border-zinc-800/80 pb-4">
+                <div>
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
+                        <i class="fa-solid fa-money-bill-transfer text-emerald-400"></i>
+                        <span>Recent Top-ups (SlipOK)</span>
+                    </h2>
+                    <p class="text-xs text-zinc-400 mt-1">Verified PromptPay slips, in THB.</p>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="border-b border-zinc-800 text-[11px] text-zinc-400 uppercase tracking-wider font-semibold">
+                            <th class="py-2.5 px-3">User</th>
+                            <th class="py-2.5 px-3">Amount (THB)</th>
                             <th class="py-2.5 px-3">Bank Ref (transRef)</th>
                             <th class="py-2.5 px-3">Time</th>
                             <th class="py-2.5 px-3">Status</th>
@@ -324,7 +367,6 @@
                                 <img src="{{ p.avatar_url or 'https://cdn.discordapp.com/embed/avatars/0.png' }}" class="w-5 h-5 rounded-full">
                                 <span class="font-medium text-zinc-200">{{ p.username or p.user_id }}</span>
                             </td>
-                            <td class="py-2.5 px-3 uppercase text-[11px] font-semibold text-violet-400">{{ p.pass_type }} Pass</td>
                             <td class="py-2.5 px-3 font-mono font-bold text-emerald-400">฿{{ "{:,.2f}".format(p.amount) }}</td>
                             <td class="py-2.5 px-3 font-mono text-[11px] text-zinc-400">{{ p.trans_ref }}</td>
                             <td class="py-2.5 px-3 text-zinc-500 font-mono text-[11px]">{{ p.created_at }}</td>
@@ -334,7 +376,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="6" class="py-6 text-center text-zinc-500">No payment transactions recorded yet.</td>
+                            <td colspan="5" class="py-6 text-center text-zinc-500">No top-up transactions recorded yet.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -353,38 +395,28 @@
     </footer>
 
     <script>
-        async function upgradeVip(userId, days) {
-            const res = await fetch('/api/admin/upgrade-vip', {
+        async function adjustBalance(userId, username) {
+            const input = prompt(`Adjust wallet balance for "${username}" in USD.\nPositive = credit, negative = debit (e.g. 5 or -2.5):`);
+            if (input === null) return;
+            const amount = parseFloat(input);
+            if (!amount || isNaN(amount)) { alert('Please enter a non-zero number.'); return; }
+            const note = prompt('Note (optional):', '') || '';
+            const res = await fetch('/api/admin/adjust-balance', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId, days: days })
+                body: JSON.stringify({ user_id: userId, amount_usd: amount, note: note })
             });
-            if (res.ok) window.location.reload();
-        }
-
-        async function revokeVip(userId) {
-            if (!confirm('Are you sure you want to revoke VIP and reset this user back to Free tier?')) return;
-            const res = await fetch('/api/admin/revoke-vip', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId })
-            });
-            if (res.ok) window.location.reload();
+            const data = await res.json();
+            if (res.ok && data.status === 'ok') {
+                window.location.reload();
+            } else {
+                alert(data.message || 'Adjustment failed.');
+            }
         }
 
         async function deleteUser(userId, username) {
-            if (!confirm(`Permanently delete user "${username}" (ID: ${userId})? This will delete all their keys and history.`)) return;
+            if (!confirm(`Permanently delete user "${username}" (ID: ${userId})? This will delete all their keys, history and wallet.`)) return;
             const res = await fetch('/api/admin/delete-user', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId })
-            });
-            if (res.ok) window.location.reload();
-        }
-
-        async function resetQuota(userId) {
-            if (!confirm('Reset token quota to 0 for this user?')) return;
-            const res = await fetch('/api/admin/reset-quota', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: userId })
@@ -408,16 +440,11 @@
         function renderPlatformChart(data) {
             const canvas = document.getElementById('platformChart');
             if (!canvas) return;
-
-            if (platformChartInstance) {
-                platformChartInstance.destroy();
-            }
-
+            if (platformChartInstance) platformChartInstance.destroy();
             const ctx = canvas.getContext('2d');
             const gradient = ctx.createLinearGradient(0, 0, 0, 180);
-            gradient.addColorStop(0, 'rgba(34, 211, 238, 0.9)'); // cyan-400
-            gradient.addColorStop(1, 'rgba(8, 145, 178, 0.65)'); // cyan-600
-
+            gradient.addColorStop(0, 'rgba(34, 211, 238, 0.9)');
+            gradient.addColorStop(1, 'rgba(8, 145, 178, 0.65)');
             platformChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -439,14 +466,8 @@
                     plugins: {
                         legend: { display: false },
                         tooltip: {
-                            backgroundColor: '#18181b',
-                            titleColor: '#f4f4f5',
-                            bodyColor: '#a1a1aa',
-                            borderColor: '#27272a',
-                            borderWidth: 1,
-                            padding: 8,
-                            cornerRadius: 6,
-                            displayColors: false,
+                            backgroundColor: '#18181b', titleColor: '#f4f4f5', bodyColor: '#a1a1aa',
+                            borderColor: '#27272a', borderWidth: 1, padding: 8, cornerRadius: 6, displayColors: false,
                             titleFont: { family: 'ui-monospace, monospace', size: 11, weight: 'bold' },
                             bodyFont: { family: 'ui-monospace, monospace', size: 11 },
                             callbacks: {
@@ -454,10 +475,7 @@
                                     const idx = context.dataIndex;
                                     const tokens = (data.tokens && data.tokens[idx] !== undefined) ? data.tokens[idx] : 0;
                                     const reqs = (data.requests && data.requests[idx] !== undefined) ? data.requests[idx] : 0;
-                                    return [
-                                        `Tokens: ${tokens.toLocaleString()}`,
-                                        `Requests: ${reqs.toLocaleString()}`
-                                    ];
+                                    return [`Tokens: ${tokens.toLocaleString()}`, `Requests: ${reqs.toLocaleString()}`];
                                 }
                             }
                         }
@@ -465,21 +483,13 @@
                     scales: {
                         x: {
                             grid: { display: false },
-                            ticks: {
-                                color: '#71717a',
-                                maxRotation: 0,
-                                autoSkip: true,
-                                maxTicksLimit: 7,
-                                font: { family: 'ui-monospace, monospace', size: 10 }
-                            }
+                            ticks: { color: '#71717a', maxRotation: 0, autoSkip: true, maxTicksLimit: 7, font: { family: 'ui-monospace, monospace', size: 10 } }
                         },
                         y: {
                             beginAtZero: true,
                             grid: { color: 'rgba(39, 39, 42, 0.4)', drawBorder: false },
                             ticks: {
-                                color: '#71717a',
-                                maxTicksLimit: 5,
-                                font: { family: 'ui-monospace, monospace', size: 10 },
+                                color: '#71717a', maxTicksLimit: 5, font: { family: 'ui-monospace, monospace', size: 10 },
                                 callback: function(val) {
                                     if (val === 0) return '0';
                                     if (val >= 1000000) return (val / 1000000).toFixed(val % 1000000 === 0 ? 0 : 1) + 'M';
@@ -497,18 +507,14 @@
             ['24h', '7d', '30d'].forEach(r => {
                 const btn = document.getElementById(`admin-range-btn-${r}`);
                 if (btn) {
-                    if (r === range) {
-                        btn.className = 'px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-white bg-zinc-800 transition shadow-xs font-mono text-[11px] sm:text-xs';
-                    } else {
-                        btn.className = 'px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 transition font-mono text-[11px] sm:text-xs';
-                    }
+                    btn.className = (r === range)
+                        ? 'px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-white bg-zinc-800 transition shadow-xs font-mono text-[11px] sm:text-xs'
+                        : 'px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 transition font-mono text-[11px] sm:text-xs';
                 }
             });
-
             const labelMap = { '24h': 'Last 24h', '7d': 'Last 7 Days', '30d': 'Last 30 Days' };
             const periodLabel = document.getElementById('admin-stat-period-label');
             if (periodLabel) periodLabel.textContent = labelMap[range] || 'In Period';
-
             try {
                 const res = await fetch(`/api/admin/analytics?range=${range}`);
                 const json = await res.json();

@@ -45,15 +45,15 @@
             </a>
         </div>
 
-        <!-- Features & Benefits (Free Tier & Tool Compatibility) -->
+        <!-- Features & Benefits -->
         <div class="border-t border-zinc-800/80 pt-5 space-y-2.5 text-xs text-zinc-400">
             <div class="flex items-center space-x-2.5">
                 <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                <span>โควตาฟรี {{ daily_tokens }} Tokens ต่อวัน (รีเซ็ตทุกเที่ยงคืน)</span>
+                <span>{{ free_models|length }} free models with unlimited usage — no daily cap</span>
             </div>
             <div class="flex items-center space-x-2.5">
                 <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>
-                <span>รองรับ Cursor, Cline, NextChat และ AI Tools ยอดนิยม</span>
+                <span>Pay-as-you-go premium models with a USD wallet (top up in THB at ฿{{ usd_to_thb | int }}/$)</span>
             </div>
             <div class="flex items-center space-x-2.5">
                 <i class="fa-solid fa-check text-emerald-400 text-xs shrink-0"></i>

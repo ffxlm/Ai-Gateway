@@ -4,16 +4,13 @@ from typing import Optional, Dict, Any, List
 from zoneinfo import ZoneInfo
 from app.core.database import db_session, get_setting
 from app.core.config import settings
+from app.core.catalog import is_premium_model, premium_price, premium_trial_tokens
 
 def generate_api_key() -> str:
     return f"sk-portal-{secrets.token_urlsafe(32)}"
 
 def now_local() -> datetime:
-    """Naive wall-clock time in the configured business timezone (default Asia/Bangkok).
-
-    Kept naive on purpose so it stays comparable with timestamps stored as naive
-    local strings (e.g. vip_expires_at) and SQLite's datetime('now','localtime').
-    """
+    """Naive wall-clock time in the configured business timezone (default Asia/Bangkok)."""
     try:
         return datetime.now(ZoneInfo(settings.TIMEZONE)).replace(tzinfo=None)
     except Exception:
@@ -23,7 +20,6 @@ def get_today_str() -> str:
     return now_local().strftime("%Y-%m-%d")
 
 def get_or_create_user(discord_id: str, username: str, avatar_url: str = "", role: str = "user") -> Dict[str, Any]:
-    today = get_today_str()
     admin_ids = [x.strip() for x in settings.ADMIN_DISCORD_IDS.split(",") if x.strip()]
     is_superadmin = str(discord_id) in admin_ids
 
@@ -31,18 +27,13 @@ def get_or_create_user(discord_id: str, username: str, avatar_url: str = "", rol
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE id = ?", (discord_id,))
         row = cursor.fetchone()
-        
+
         if row:
             user = dict(row)
             # Ensure superadmin role persists
             if is_superadmin and user["role"] != "admin":
                 cursor.execute("UPDATE users SET role = 'admin' WHERE id = ?", (discord_id,))
                 user["role"] = "admin"
-            # Daily quota rollover check
-            if user["last_usage_date"] != today:
-                cursor.execute("UPDATE users SET daily_token_usage = 0, last_usage_date = ? WHERE id = ?", (today, discord_id))
-                user["daily_token_usage"] = 0
-                user["last_usage_date"] = today
             # Update avatar/username if changed
             cursor.execute("UPDATE users SET username = ?, avatar_url = ? WHERE id = ?", (username, avatar_url, discord_id))
             return user
@@ -53,154 +44,202 @@ def get_or_create_user(discord_id: str, username: str, avatar_url: str = "", rol
             assigned_role = "admin" if (user_count == 0 or is_superadmin) else role
 
             cursor.execute("""
-            INSERT INTO users (id, username, avatar_url, api_key, role, tier, daily_token_usage, last_usage_date)
-            VALUES (?, ?, ?, ?, ?, 'free', 0, ?)
-            """, (discord_id, username, avatar_url, api_key, assigned_role, today))
+            INSERT INTO users (id, username, avatar_url, api_key, role, tier, balance)
+            VALUES (?, ?, ?, ?, ?, 'free', 0)
+            """, (discord_id, username, avatar_url, api_key, assigned_role))
             cursor.execute("SELECT * FROM users WHERE id = ?", (discord_id,))
             return dict(cursor.fetchone())
 
 def get_user_by_api_key(api_key: str) -> Optional[Dict[str, Any]]:
-    today = get_today_str()
     with db_session() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE api_key = ?", (api_key,))
         row = cursor.fetchone()
         if not row:
             return None
-        user = dict(row)
-        # Check quota rollover
-        if user["last_usage_date"] != today:
-            cursor.execute("UPDATE users SET daily_token_usage = 0, last_usage_date = ? WHERE id = ?", (today, user["id"]))
-            user["daily_token_usage"] = 0
-            user["last_usage_date"] = today
-        return user
+        return dict(row)
 
-def apply_daily_rollover(user: Dict[str, Any]) -> Dict[str, Any]:
-    """Reset a single user's daily usage if the business date has changed.
+# ─────────────────────────────────────────────────────────────────────────────
+# Premium free trial (per-model daily token allowance before wallet billing)
+# ─────────────────────────────────────────────────────────────────────────────
 
-    Used by read paths (e.g. the dashboard session lookup) that do not go through
-    the API-key / login flow, so the UI reflects the reset immediately after midnight.
+def premium_trial_limit(model: str) -> int:
+    """Daily free-trial allowance for a model.
+
+    A per-model value from the catalog wins; otherwise the global
+    ``premium_trial_tokens_per_day`` setting (editable in the Admin panel) is used.
     """
-    today = get_today_str()
-    if user.get("last_usage_date") != today:
-        with db_session() as conn:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE users SET daily_token_usage = 0, last_usage_date = ? WHERE id = ?", (today, user["id"]))
-        user["daily_token_usage"] = 0
-        user["last_usage_date"] = today
-    return user
-
-def reset_all_stale_quota() -> int:
-    """Reset daily usage for every user whose last_usage_date is not the current business date.
-
-    Called on startup and by the midnight scheduler in app.main.
-    """
-    today = get_today_str()
-    with db_session() as conn:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE users SET daily_token_usage = 0, last_usage_date = ? WHERE last_usage_date != ?", (today, today))
-        return cursor.rowcount
-
-def is_vip_active(user: Dict[str, Any]) -> bool:
-    if user.get("tier") == "vip" and user.get("vip_expires_at"):
+    override = premium_trial_tokens(model)
+    if override is not None:
         try:
-            exp = datetime.fromisoformat(user["vip_expires_at"])
-            return exp > now_local()
-        except Exception:
-            return False
-    return False
+            return max(int(override), 0)
+        except (TypeError, ValueError):
+            pass
+    try:
+        return max(int(get_setting("premium_trial_tokens_per_day", str(settings.PREMIUM_TRIAL_TOKENS_PER_DAY))), 0)
+    except (TypeError, ValueError):
+        return settings.PREMIUM_TRIAL_TOKENS_PER_DAY
 
-def check_user_quota(user: Dict[str, Any]) -> tuple[bool, str]:
-    if user.get("is_banned"):
-        return False, "Your account has been suspended by the administrator."
-    
-    if is_vip_active(user):
-        return True, "VIP Active (Unlimited)"
-    
-    daily_limit = int(get_setting("daily_free_tokens", "5000000"))
-    used = user.get("daily_token_usage", 0)
-    
-    if used >= daily_limit:
-        return False, f"Daily free token quota exceeded ({used:,} / {daily_limit:,} tokens). Upgrading to VIP or resets at 00:00."
-    
-    return True, f"Remaining: {daily_limit - used:,} tokens"
+def premium_trial_used(user_id: str, model: str) -> int:
+    """Tokens already consumed today for this model (0 once the day rolls over)."""
+    with db_session() as conn:
+        row = conn.cursor().execute(
+            "SELECT tokens_used FROM model_trial_usage WHERE user_id = ? AND model = ? AND usage_date = ?",
+            (user_id, model, get_today_str()),
+        ).fetchone()
+        return int(row["tokens_used"]) if row else 0
 
-def atomic_record_usage(user_id: str, tokens: int, model: str = "", latency_ms: float = 0.0, status_code: int = 200, is_vip: bool = False):
-    """Record a completed request.
+def premium_trial_remaining(user_id: str, model: str) -> int:
+    return max(premium_trial_limit(model) - premium_trial_used(user_id, model), 0)
 
-    Every request is logged to request_logs (used for analytics), but only Free-tier
-    usage is charged against the daily free quota. VIP usage is unlimited and must not
-    consume the free allowance, so a VIP who later drops back to Free keeps the free
-    quota for that day intact.
-    """
-    today = get_today_str()
+def premium_trial_status(user_id: str, model: str) -> Dict[str, Any]:
+    """Everything the dashboard needs to render a model's trial meter."""
+    limit = premium_trial_limit(model)
+    used = premium_trial_used(user_id, model)
+    remaining = max(limit - used, 0)
+    pct = min(int((used / limit) * 100), 100) if limit > 0 else 0
+    return {"model": model, "limit": limit, "used": used, "remaining": remaining, "pct": pct}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Wallet
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_balance(user_id: str) -> float:
+    with db_session() as conn:
+        row = conn.cursor().execute("SELECT balance FROM users WHERE id = ?", (user_id,)).fetchone()
+        return float(row["balance"] or 0) if row else 0.0
+
+def add_balance(user_id: str, amount_usd: float, tx_type: str = "topup",
+                description: str = "", trans_ref: str = "") -> float:
+    """Credit (positive) or debit (negative) the wallet atomically. Returns the new balance."""
     with db_session() as conn:
         cursor = conn.cursor()
-        # Charge the daily free quota only for non-VIP requests
-        if not is_vip:
-            cursor.execute("""
-            UPDATE users 
-            SET daily_token_usage = daily_token_usage + ?, last_usage_date = ?
-            WHERE id = ?
-            """, (tokens, today, user_id))
-        
-        # Log every request (Free + VIP) for analytics
+        row = cursor.execute("SELECT balance FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not row:
+            return 0.0
+        new_balance = float(row["balance"] or 0) + float(amount_usd)
+        if tx_type == "topup" and amount_usd > 0:
+            cursor.execute(
+                "UPDATE users SET balance = ?, total_topped_up = total_topped_up + ? WHERE id = ?",
+                (new_balance, amount_usd, user_id),
+            )
+        else:
+            cursor.execute("UPDATE users SET balance = ? WHERE id = ?", (new_balance, user_id))
+        cursor.execute("""
+        INSERT INTO wallet_transactions (user_id, tx_type, amount_usd, balance_after, description, trans_ref)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (user_id, tx_type, amount_usd, new_balance, description, trans_ref))
+        return new_balance
+
+def record_usage(user_id: str, model: str, tokens_in: int, tokens_out: int,
+                 latency_ms: float = 0.0, status_code: int = 200) -> float:
+    """Log a completed request.
+
+    Free models are never charged. Premium models consume the daily free trial
+    first (input tokens, then output tokens); anything beyond the trial is billed
+    from the wallet at the model's per-token rates.
+
+    Returns the USD amount charged (0.0 for free models or trial-covered usage).
+    """
+    tokens_in = max(int(tokens_in or 0), 0)
+    tokens_out = max(int(tokens_out or 0), 0)
+    total_tokens = tokens_in + tokens_out
+    cost = 0.0
+
+    is_premium = is_premium_model(model)
+    limit = premium_trial_limit(model) if is_premium else 0
+    today = get_today_str()
+
+    with db_session() as conn:
+        cursor = conn.cursor()
         cursor.execute("""
         INSERT INTO request_logs (user_id, model, tokens_used, latency_ms, status_code)
         VALUES (?, ?, ?, ?, ?)
-        """, (user_id, model, tokens, latency_ms, status_code))
+        """, (user_id, model, total_tokens, latency_ms, status_code))
+
+        if is_premium:
+            row = cursor.execute(
+                "SELECT balance FROM users WHERE id = ?",
+                (user_id,),
+            ).fetchone()
+            used_row = cursor.execute(
+                "SELECT tokens_used FROM model_trial_usage WHERE user_id = ? AND model = ? AND usage_date = ?",
+                (user_id, model, today),
+            ).fetchone()
+            if row:
+                used = int(used_row["tokens_used"]) if used_row else 0
+
+                # Apply this model's free trial: input tokens first, then output tokens.
+                remaining = max(limit - used, 0)
+                free_in = min(tokens_in, remaining)
+                remaining -= free_in
+                free_out = min(tokens_out, remaining)
+                paid_in = tokens_in - free_in
+                paid_out = tokens_out - free_out
+
+                cost = premium_price(model, paid_in, paid_out)
+                new_balance = float(row["balance"] or 0)
+                if cost > 0:
+                    new_balance -= cost
+
+                # Accumulate today's trial usage for this model only.
+                cursor.execute("""
+                INSERT INTO model_trial_usage (user_id, model, usage_date, tokens_used)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(user_id, model, usage_date)
+                DO UPDATE SET tokens_used = tokens_used + excluded.tokens_used
+                """, (user_id, model, today, total_tokens))
+
+                cursor.execute(
+                    "UPDATE users SET balance = ?, total_spent = total_spent + ? WHERE id = ?",
+                    (new_balance, cost, user_id),
+                )
+                if cost > 0:
+                    cursor.execute("""
+                    INSERT INTO wallet_transactions
+                    (user_id, tx_type, amount_usd, balance_after, description, model, tokens_in, tokens_out)
+                    VALUES (?, 'usage', ?, ?, ?, ?, ?, ?)
+                    """, (user_id, -cost, new_balance, f"{total_tokens:,} tokens", model, paid_in, paid_out))
+    return cost
+
+def get_wallet_transactions(user_id: str, limit: int = 25) -> List[Dict[str, Any]]:
+    with db_session() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT * FROM wallet_transactions WHERE user_id = ?
+        ORDER BY id DESC LIMIT ?
+        """, (user_id, limit))
+        return [dict(r) for r in cursor.fetchall()]
+
+def get_all_wallet_transactions(limit: int = 50) -> List[Dict[str, Any]]:
+    with db_session() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT w.*, u.username, u.avatar_url
+        FROM wallet_transactions w
+        LEFT JOIN users u ON w.user_id = u.id
+        ORDER BY w.id DESC LIMIT ?
+        """, (limit,))
+        return [dict(r) for r in cursor.fetchall()]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# User administration
+# ─────────────────────────────────────────────────────────────────────────────
 
 def regenerate_user_key(user_id: str) -> str:
     new_key = generate_api_key()
     with db_session() as conn:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE users SET api_key = ? WHERE id = ?", (new_key, user_id))
+        conn.cursor().execute("UPDATE users SET api_key = ? WHERE id = ?", (new_key, user_id))
     return new_key
 
-def add_vip_days(user_id: str, days: int) -> str:
-    with db_session() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT tier, vip_expires_at FROM users WHERE id = ?", (user_id,))
-        row = cursor.fetchone()
-        if not row:
-            return ""
-        
-        current_exp = None
-        if row["vip_expires_at"]:
-            try:
-                parsed = datetime.fromisoformat(row["vip_expires_at"])
-                if parsed > now_local():
-                    current_exp = parsed
-            except Exception:
-                pass
-        
-        start_time = current_exp if current_exp else now_local()
-        new_exp = start_time + timedelta(days=days)
-        new_exp_str = new_exp.isoformat()
-        
-        cursor.execute("""
-        UPDATE users 
-        SET tier = 'vip', vip_expires_at = ?
-        WHERE id = ?
-        """, (new_exp_str, user_id))
-        return new_exp_str
-
-def revoke_vip(user_id: str):
-    """Cancels VIP status immediately and resets user back to Free tier."""
-    with db_session() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-        UPDATE users 
-        SET tier = 'free', vip_expires_at = NULL 
-        WHERE id = ?
-        """, (user_id,))
-
 def delete_user(user_id: str):
-    """Completely removes user and their request logs from the database."""
+    """Completely removes user, their request logs and wallet ledger."""
     with db_session() as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         cursor.execute("DELETE FROM request_logs WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM wallet_transactions WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM model_trial_usage WHERE user_id = ?", (user_id,))
 
 def toggle_user_ban(user_id: str) -> int:
     with db_session() as conn:
@@ -213,74 +252,65 @@ def toggle_user_ban(user_id: str) -> int:
         cursor.execute("UPDATE users SET is_banned = ? WHERE id = ?", (new_status, user_id))
         return new_status
 
-def reset_user_quota(user_id: str):
-    with db_session() as conn:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE users SET daily_token_usage = 0 WHERE id = ?", (user_id,))
-
 def get_all_users() -> List[Dict[str, Any]]:
     with db_session() as conn:
         cursor = conn.cursor()
-        # today_real_usage is the raw request_logs sum for today (all tiers).
         cursor.execute("""
         SELECT u.*,
                COALESCE((
                    SELECT SUM(r.tokens_used) FROM request_logs r
                    WHERE r.user_id = u.id AND DATE(r.created_at) = DATE('now', 'localtime')
-               ), 0) AS today_real_usage
+               ), 0) AS today_tokens
         FROM users u
         ORDER BY u.created_at DESC
         """)
-        users = [dict(r) for r in cursor.fetchall()]
-
-    # "Today Usage" is tier-dependent:
-    #   - Free users: the daily quota actually consumed (users.daily_token_usage), which the
-    #     admin Reset Quota button clears -> the number drops to 0 as expected.
-    #   - VIP users: real usage from request_logs (their quota is unlimited, so a quota reset
-    #     is meaningless and daily_token_usage stays at 0 for them).
-    for u in users:
-        u["today_tokens"] = u["today_real_usage"] if is_vip_active(u) else u.get("daily_token_usage", 0)
-    return users
+        return [dict(r) for r in cursor.fetchall()]
 
 def get_portal_stats() -> Dict[str, Any]:
     with db_session() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) AS total_users FROM users")
-        total_users = cursor.fetchone()["total_users"]
-        
-        cursor.execute("SELECT COUNT(*) AS total_vip FROM users WHERE tier = 'vip' AND vip_expires_at > ?", (now_local().isoformat(),))
-        total_vip = cursor.fetchone()["total_vip"]
-        
-        # Total tokens today is summed from request_logs so it includes VIP usage too
-        # (VIP usage is intentionally not charged to users.daily_token_usage).
-        cursor.execute("SELECT COALESCE(SUM(tokens_used), 0) AS total_tokens_today FROM request_logs WHERE DATE(created_at) = DATE('now', 'localtime')")
-        total_tokens_today = cursor.fetchone()["total_tokens_today"] or 0
-        
-        cursor.execute("SELECT COUNT(*) AS requests_today FROM request_logs WHERE DATE(created_at) = DATE('now', 'localtime')")
-        requests_today = cursor.fetchone()["requests_today"]
+        total_users = cursor.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
 
-        # Platform-wide cumulative totals (Free + VIP)
-        cursor.execute("SELECT COALESCE(SUM(tokens_used), 0) AS all_time FROM request_logs")
-        all_time_tokens = cursor.fetchone()["all_time"]
+        # Wallet liability = total USD currently held by all users.
+        row = cursor.execute("SELECT COALESCE(SUM(balance), 0) AS n FROM users").fetchone()
+        total_balance = float(row["n"] or 0)
 
-        cursor.execute("SELECT COUNT(DISTINCT DATE(created_at)) AS active_days FROM request_logs")
-        active_days = cursor.fetchone()["active_days"] or 0
+        row = cursor.execute("SELECT COALESCE(SUM(total_topped_up), 0) AS n FROM users").fetchone()
+        total_topped_up = float(row["n"] or 0)
+
+        row = cursor.execute("SELECT COALESCE(SUM(total_spent), 0) AS n FROM users").fetchone()
+        total_spent = float(row["n"] or 0)
+
+        total_tokens_today = cursor.execute(
+            "SELECT COALESCE(SUM(tokens_used), 0) AS n FROM request_logs WHERE DATE(created_at) = DATE('now', 'localtime')"
+        ).fetchone()["n"] or 0
+
+        requests_today = cursor.execute(
+            "SELECT COUNT(*) AS n FROM request_logs WHERE DATE(created_at) = DATE('now', 'localtime')"
+        ).fetchone()["n"]
+
+        all_time_tokens = cursor.execute("SELECT COALESCE(SUM(tokens_used), 0) AS n FROM request_logs").fetchone()["n"]
+
+        active_days = cursor.execute("SELECT COUNT(DISTINCT DATE(created_at)) AS n FROM request_logs").fetchone()["n"] or 0
         avg_per_day = int(all_time_tokens / active_days) if active_days > 0 else 0
 
         return {
             "total_users": total_users,
-            "total_vip": total_vip,
+            "total_balance": total_balance,
+            "total_topped_up": total_topped_up,
+            "total_spent": total_spent,
             "total_tokens_today": total_tokens_today,
             "requests_today": requests_today,
             "all_time_tokens": all_time_tokens,
-            "avg_per_day": avg_per_day
+            "avg_per_day": avg_per_day,
         }
 
-def _aggregate_usage(time_range: str, user_id: Optional[str] = None) -> Dict[str, Any]:
-    """Aggregate request_logs into time buckets, optionally scoped to a single user.
+# ─────────────────────────────────────────────────────────────────────────────
+# Usage analytics
+# ─────────────────────────────────────────────────────────────────────────────
 
-    Returns labels/tokens/requests for the requested range plus the all-time total.
-    """
+def _aggregate_usage(time_range: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Aggregate request_logs into time buckets, optionally scoped to a single user."""
     now = now_local()
     user_clause = "AND user_id = ?" if user_id else ""
     user_params = (user_id,) if user_id else ()
@@ -330,14 +360,13 @@ def _aggregate_usage(time_range: str, user_id: Optional[str] = None) -> Dict[str
             "period_requests": sum(req_data),
             "labels": labels,
             "tokens": token_data,
-            "requests": req_data
+            "requests": req_data,
         }
 
 def get_user_analytics(user_id: str, time_range: str = "24h") -> Dict[str, Any]:
     return _aggregate_usage(time_range, user_id)
 
 def get_portal_analytics(time_range: str = "24h") -> Dict[str, Any]:
-    """Platform-wide usage analytics across all users, plus the average per active day."""
     data = _aggregate_usage(time_range)
     with db_session() as conn:
         cursor = conn.cursor()
@@ -346,5 +375,3 @@ def get_portal_analytics(time_range: str = "24h") -> Dict[str, Any]:
     data["active_days"] = active_days
     data["avg_per_day"] = int(data["all_time_tokens"] / active_days) if active_days > 0 else 0
     return data
-
-
