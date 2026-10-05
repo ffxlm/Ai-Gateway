@@ -208,6 +208,7 @@ async def login_page(request: Request):
         "free_models": FREE_MODELS,
         "usd_to_thb": _usd_rate(),
         "discord_invite": get_setting("discord_invite_url", settings.DISCORD_INVITE_URL),
+        "api_endpoint": f"{str(request.base_url).rstrip('/')}/v1",
     })
 
 

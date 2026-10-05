@@ -11,112 +11,138 @@
             background-color: #09090b;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
-        /* Soft grid + glow backdrop */
-        .bg-grid {
+        .grid-bg {
             background-image:
-                linear-gradient(to right, rgba(63, 63, 70, 0.18) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(63, 63, 70, 0.18) 1px, transparent 1px);
-            background-size: 44px 44px;
-            -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 40%, transparent 100%);
-            mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 40%, transparent 100%);
+                linear-gradient(rgba(99, 102, 241, 0.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99, 102, 241, 0.06) 1px, transparent 1px);
+            background-size: 34px 34px;
         }
-        .glow-a { background: radial-gradient(circle, rgba(99,102,241,0.20) 0%, transparent 65%); }
-        .glow-b { background: radial-gradient(circle, rgba(16,185,129,0.14) 0%, transparent 65%); }
-        @keyframes floatUp {
-            from { opacity: 0; transform: translateY(14px); }
-            to   { opacity: 1; transform: translateY(0); }
+        .glow {
+            background: radial-gradient(circle at 50% 45%, rgba(99, 102, 241, 0.22), rgba(139, 92, 246, 0.10) 40%, transparent 70%);
         }
-        .fade-in { animation: floatUp 0.5s ease-out both; }
-        .fade-in-1 { animation-delay: 0.05s; }
-        .fade-in-2 { animation-delay: 0.12s; }
-        .fade-in-3 { animation-delay: 0.19s; }
     </style>
 </head>
-<body class="text-zinc-100 min-h-screen relative flex items-center justify-center p-4 antialiased overflow-x-hidden">
+<body class="text-zinc-100 min-h-screen flex items-center justify-center p-4 sm:p-6 antialiased selection:bg-indigo-500 selection:text-white">
 
-    <!-- Ambient backdrop -->
-    <div class="pointer-events-none fixed inset-0 -z-10">
-        <div class="absolute inset-0 bg-grid opacity-60"></div>
-        <div class="glow-a absolute -top-24 -left-24 h-[520px] w-[520px] rounded-full blur-3xl"></div>
-        <div class="glow-b absolute -bottom-32 -right-24 h-[460px] w-[460px] rounded-full blur-3xl"></div>
-    </div>
+    <!-- Two-column shell: form on the left, product story on the right -->
+    <div class="w-full max-w-5xl rounded-2xl bg-zinc-900/60 border border-zinc-800/80 shadow-2xl backdrop-blur-xs overflow-hidden grid md:grid-cols-2">
 
-    <div class="w-full max-w-md fade-in">
+        <!-- ─── LEFT: Sign-in ─── -->
+        <div class="p-6 sm:p-8 lg:p-10 flex flex-col min-h-[560px]">
 
-        <!-- Brand -->
-        <div class="text-center mb-6">
-            <div class="inline-flex h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-zinc-900 border border-zinc-700/70 items-center justify-center text-zinc-100 shadow-lg shadow-indigo-950/40 mb-4">
-                <i class="fa-solid fa-microchip text-xl"></i>
+            <!-- Brand -->
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="h-9 w-9 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-center text-zinc-200 shadow-xs">
+                        <i class="fa-solid fa-microchip text-sm"></i>
+                    </div>
+                    <span class="font-semibold text-sm tracking-wide text-zinc-100">AI Gateway</span>
+                </div>
+                <div class="hidden sm:flex items-center space-x-2 text-[11px] text-zinc-500">
+                    <span class="flex h-2 w-2 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span>All systems operational</span>
+                </div>
             </div>
-            <h1 class="text-2xl font-bold tracking-tight text-white">AI Gateway Portal</h1>
-            <p class="text-xs text-zinc-400 mt-1.5">High-concurrency LLM routing &amp; developer API access</p>
-            <div class="mt-3 inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/70 px-3 py-1">
-                <span class="flex h-1.5 w-1.5 relative">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+
+            <!-- Form (vertically centered) -->
+            <div class="flex-1 flex flex-col justify-center py-8">
+                <div class="space-y-1.5">
+                    <h1 class="text-2xl font-bold tracking-tight text-zinc-100">Welcome!</h1>
+                    <p class="text-sm text-zinc-400">Sign in to access your models, wallet, and API keys.</p>
+                </div>
+
+                {% if error %}
+                <div class="mt-6 p-3 rounded-lg bg-rose-950/40 border border-rose-900/60 text-rose-300 text-xs flex items-center space-x-2.5">
+                    <i class="fa-solid fa-circle-exclamation text-rose-400 shrink-0"></i>
+                    <span>{{ error }}</span>
+                </div>
+                {% endif %}
+
+                <!-- Primary Action: Discord OAuth -->
+                <div class="mt-6 space-y-2.5">
+                    <a href="/auth/discord/login" class="w-full py-3 px-4 bg-[#5865F2] hover:bg-[#4752c4] text-white font-semibold text-sm rounded-lg transition flex items-center justify-center space-x-2.5 shadow-lg shadow-indigo-950/40 active:scale-[0.99]">
+                        <i class="fa-brands fa-discord text-lg"></i>
+                        <span>Continue with Discord</span>
+                    </a>
+                    <p class="text-center text-[11px] text-zinc-500">
+                        Can't sign in? <a href="{{ discord_invite }}" target="_blank" rel="noopener" class="text-indigo-400 hover:text-indigo-300 font-medium">Contact support</a>
+                    </p>
+                </div>
+
+                <!-- Feature list -->
+                <div class="mt-8 space-y-3 text-xs text-zinc-400">
+                    <div class="flex items-start space-x-2.5">
+                        <i class="fa-solid fa-infinity text-emerald-400 text-xs shrink-0 mt-0.5"></i>
+                        <span><span class="text-zinc-200 font-medium">{{ free_models|length }} free models</span> with unlimited usage — no daily cap</span>
+                    </div>
+                    <div class="flex items-start space-x-2.5">
+                        <i class="fa-solid fa-crown text-violet-400 text-xs shrink-0 mt-0.5"></i>
+                        <span><span class="text-zinc-200 font-medium">Premium xHigh models</span> with a daily free trial, then pay-as-you-go</span>
+                    </div>
+                    <div class="flex items-start space-x-2.5">
+                        <i class="fa-solid fa-wallet text-emerald-400 text-xs shrink-0 mt-0.5"></i>
+                        <span>Top up in Thai Baht (฿{{ usd_to_thb | int }} = $1) into a prepaid USD wallet</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terms -->
+            <div class="border-t border-zinc-800/60 pt-4 text-center text-[11px] text-zinc-600">
+                By signing in, you agree to our Terms of Service &amp; acceptable use policies.
+            </div>
+        </div>
+
+        <!-- ─── RIGHT: Product story (desktop only) ─── -->
+        <div class="relative hidden md:flex flex-col justify-center p-8 lg:p-10 bg-zinc-950 border-l border-zinc-800/80 overflow-hidden">
+            <div class="absolute inset-0 grid-bg opacity-70"></div>
+            <div class="absolute inset-0 glow"></div>
+
+            <div class="relative space-y-6">
+                <span class="inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[11px] font-medium text-violet-300 w-fit">
+                    <i class="fa-solid fa-bolt text-[10px]"></i>Fast &amp; Stable
                 </span>
-                <span class="text-[11px] text-zinc-400 font-medium">All Systems Operational</span>
-            </div>
-        </div>
 
-        <!-- Card -->
-        <div class="fade-in fade-in-1 rounded-2xl bg-zinc-900/70 border border-zinc-800/80 p-6 sm:p-7 space-y-5 shadow-2xl shadow-black/40 backdrop-blur-md">
+                <h2 class="text-3xl font-bold leading-tight tracking-tight text-zinc-100">
+                    One endpoint.<br>
+                    <span class="text-zinc-400">Every model you need.</span>
+                </h2>
 
-            {% if error %}
-            <div class="p-3 rounded-lg bg-rose-950/40 border border-rose-900/60 text-rose-300 text-xs flex items-center space-x-2.5">
-                <i class="fa-solid fa-circle-exclamation text-rose-400 shrink-0"></i>
-                <span>{{ error }}</span>
-            </div>
-            {% endif %}
-
-            <!-- Discord OAuth -->
-            <div class="space-y-2.5">
-                <a href="/auth/discord/login" class="group w-full py-3 px-4 bg-[#5865F2] hover:bg-[#4a55e0] text-white font-semibold text-sm rounded-xl transition-all duration-200 flex items-center justify-center space-x-2.5 shadow-lg shadow-[#5865F2]/20 hover:shadow-[#5865F2]/30 active:scale-[0.99]">
-                    <i class="fa-brands fa-discord text-lg"></i>
-                    <span>Continue with Discord</span>
-                    <i class="fa-solid fa-arrow-right text-xs opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all"></i>
-                </a>
-                <p class="text-center text-[11px] text-zinc-500">
-                    เข้าสู่ระบบไม่ได้? <a href="{{ discord_invite }}" target="_blank" rel="noopener" class="text-indigo-400 hover:text-indigo-300 font-medium">ติดต่อทีมงานผ่าน Discord</a>
+                <p class="text-sm text-zinc-400 leading-relaxed">
+                    Drop-in compatible with the [OI] API. Point your existing tools at our base URL and start building in seconds.
                 </p>
-            </div>
 
-            <!-- Feature list -->
-            <div class="border-t border-zinc-800/80 pt-5 space-y-3">
-                <div class="flex items-start gap-3">
-                    <div class="h-6 w-6 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-                        <i class="fa-solid fa-infinity text-[10px]"></i>
+                <!-- Code sample -->
+                <div class="rounded-xl border border-zinc-800 bg-zinc-900/80 backdrop-blur-xs overflow-hidden shadow-xl">
+                    <div class="flex items-center space-x-1.5 px-3.5 py-2.5 border-b border-zinc-800/80">
+                        <span class="h-2.5 w-2.5 rounded-full bg-rose-500/70"></span>
+                        <span class="h-2.5 w-2.5 rounded-full bg-amber-500/70"></span>
+                        <span class="h-2.5 w-2.5 rounded-full bg-emerald-500/70"></span>
+                        <span class="ml-2 text-[11px] text-zinc-500 font-mono">quickstart.sh</span>
                     </div>
-                    <div class="text-xs leading-relaxed">
-                        <span class="text-zinc-200 font-medium">{{ free_models|length }} free models</span>
-                        <span class="text-zinc-400"> with unlimited usage — no daily cap</span>
-                    </div>
+                    <pre class="p-4 text-[11px] leading-relaxed font-mono text-zinc-300 overflow-x-auto"><span class="text-zinc-500"># base URL + your personal key</span>
+<span class="text-emerald-400">curl</span> {{ api_endpoint or 'https://api.yourapp.com/v1' }}/chat/completions \
+  -H <span class="text-amber-300">"Authorization: Bearer sk-portal-..."</span> \
+  -d <span class="text-amber-300">'{"model": "deepseek-v4-flash",</span>
+<span class="text-amber-300">       "messages": [{"role": "user",</span>
+<span class="text-amber-300">         "content": "Hello!"}]}'</span></pre>
                 </div>
-                <div class="flex items-start gap-3">
-                    <div class="h-6 w-6 rounded-md bg-violet-500/10 border border-violet-500/25 text-violet-300 flex items-center justify-center shrink-0 mt-0.5">
-                        <i class="fa-solid fa-crown text-[10px]"></i>
-                    </div>
-                    <div class="text-xs leading-relaxed">
-                        <span class="text-zinc-200 font-medium">xHigh premium models</span>
-                        <span class="text-zinc-400"> — pay-as-you-go from a USD wallet (top up in THB at ฿{{ usd_to_thb | int }}/$)</span>
-                    </div>
-                </div>
-                <div class="flex items-start gap-3">
-                    <div class="h-6 w-6 rounded-md bg-sky-500/10 border border-sky-500/25 text-sky-400 flex items-center justify-center shrink-0 mt-0.5">
-                        <i class="fa-solid fa-key text-[10px]"></i>
-                    </div>
-                    <div class="text-xs leading-relaxed">
-                        <span class="text-zinc-200 font-medium">[OI]-compatible API</span>
-                        <span class="text-zinc-400"> — plug into Cursor, Cline, NextChat or any SDK</span>
-                    </div>
+
+                <!-- Stat chips -->
+                <div class="flex flex-wrap gap-2 pt-1">
+                    <span class="inline-flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/70 px-2.5 py-1.5 text-[11px] text-zinc-300">
+                        <i class="fa-solid fa-infinity text-emerald-400 text-[10px]"></i>Unlimited free tier
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/70 px-2.5 py-1.5 text-[11px] text-zinc-300">
+                        <i class="fa-solid fa-bolt text-sky-400 text-[10px]"></i>High concurrency
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/70 px-2.5 py-1.5 text-[11px] text-zinc-300">
+                        <i class="fa-solid fa-shield-halved text-violet-400 text-[10px]"></i>Per-request metering
+                    </span>
                 </div>
             </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="fade-in fade-in-3 text-center text-[11px] text-zinc-600 mt-5 space-y-1">
-            <p>By signing in, you agree to our Terms of Service &amp; acceptable use policies.</p>
-            <p class="text-zinc-700">© 2026 Ai Gateway · by ffxlm</p>
         </div>
 
     </div>
