@@ -221,18 +221,26 @@ def reset_user_quota(user_id: str):
 def get_all_users() -> List[Dict[str, Any]]:
     with db_session() as conn:
         cursor = conn.cursor()
-        # today_tokens comes from request_logs so it reflects real usage for every tier
-        # (users.daily_token_usage only tracks Free-tier quota consumption).
+        # today_real_usage is the raw request_logs sum for today (all tiers).
         cursor.execute("""
         SELECT u.*,
                COALESCE((
                    SELECT SUM(r.tokens_used) FROM request_logs r
                    WHERE r.user_id = u.id AND DATE(r.created_at) = DATE('now', 'localtime')
-               ), 0) AS today_tokens
+               ), 0) AS today_real_usage
         FROM users u
         ORDER BY u.created_at DESC
         """)
-        return [dict(r) for r in cursor.fetchall()]
+        users = [dict(r) for r in cursor.fetchall()]
+
+    # "Today Usage" is tier-dependent:
+    #   - Free users: the daily quota actually consumed (users.daily_token_usage), which the
+    #     admin Reset Quota button clears -> the number drops to 0 as expected.
+    #   - VIP users: real usage from request_logs (their quota is unlimited, so a quota reset
+    #     is meaningless and daily_token_usage stays at 0 for them).
+    for u in users:
+        u["today_tokens"] = u["today_real_usage"] if is_vip_active(u) else u.get("daily_token_usage", 0)
+    return users
 
 def get_portal_stats() -> Dict[str, Any]:
     with db_session() as conn:
