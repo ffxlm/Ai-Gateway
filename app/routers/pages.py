@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Request, HTTPException, Depends, Form, File, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
+import csv
+import io
 import os
 from app.core.config import settings
 from app.core.database import db_session, get_setting, update_setting
@@ -9,7 +11,8 @@ from app.services.user_service import (
     get_or_create_user, regenerate_user_key, delete_user, toggle_user_ban,
     get_all_users, get_portal_stats, get_user_analytics, get_portal_analytics,
     add_balance, get_wallet_transactions, get_all_wallet_transactions,
-    premium_trial_status,
+    premium_trial_status, count_request_logs, get_request_logs,
+    get_trial_history, get_reconciliation, get_request_summary,
 )
 from app.services.payment_service import (
     generate_promptpay_payload, generate_qr_data_url, verify_slip_with_slipok, is_trans_ref_used,
@@ -107,6 +110,22 @@ def _topup_packages(rate: float) -> list:
             continue
         packages.append({"thb": thb, "usd": _usd_from_thb(thb, rate)})
     return packages
+
+
+def _parse_request_filters(request: Request) -> dict:
+    """Shared query-string parsing for the Request Log page and its CSV export."""
+    q = request.query_params
+    status = (q.get("status") or "").strip()
+    if not status.isdigit():
+        status = None
+    return {
+        "user_id": (q.get("user_id") or "").strip() or None,
+        "model": (q.get("model") or "").strip() or None,
+        "date_from": (q.get("date_from") or "").strip() or None,
+        "date_to": (q.get("date_to") or "").strip() or None,
+        "status": status,
+        "premium_only": q.get("premium_only") in ("1", "true", "on"),
+    }
 
 
 @pages_router.get("/", response_class=HTMLResponse)
@@ -211,6 +230,7 @@ async def admin_page(request: Request):
     recent_payments = get_recent_payments(20)
     wallet_tx = get_all_wallet_transactions(30)
     portal_analytics = get_portal_analytics("7d")
+    reconciliation = get_reconciliation()
 
     return templates.TemplateResponse(request, "admin.html", {
         "user": user,
@@ -220,7 +240,76 @@ async def admin_page(request: Request):
         "payments": recent_payments,
         "wallet_tx": wallet_tx,
         "analytics": portal_analytics,
+        "reconciliation": reconciliation,
     })
+
+
+@pages_router.get("/admin/requests", response_class=HTMLResponse)
+async def admin_requests_page(request: Request):
+    user = get_session_user(request)
+    if not user or user.get("role") != "admin":
+        return RedirectResponse(url="/")
+
+    filters = _parse_request_filters(request)
+    try:
+        page = max(int(request.query_params.get("page", 1)), 1)
+    except (TypeError, ValueError):
+        page = 1
+    per_page = 50
+    offset = (page - 1) * per_page
+
+    total = count_request_logs(**filters)
+    logs = get_request_logs(**filters, limit=per_page, offset=offset)
+    trial_history = get_trial_history(user_id=filters["user_id"], days=14)
+    summary = get_request_summary(**filters)
+
+    return templates.TemplateResponse(request, "admin_requests.html", {
+        "user": user,
+        "logs": logs,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": max((total + per_page - 1) // per_page, 1),
+        "filters": filters,
+        "summary": summary,
+        "all_users": get_all_users(),
+        "model_options": FREE_MODELS + [m["id"] for m in PREMIUM_MODELS],
+        "trial_history": trial_history,
+        "usd_to_thb": _usd_rate(),
+    })
+
+
+@pages_router.get("/admin/requests/export")
+async def admin_requests_export(request: Request):
+    user = get_session_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    filters = _parse_request_filters(request)
+    rows = get_request_logs(**filters, limit=100000, offset=0)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "time", "user_id", "username", "model", "premium",
+        "tokens_in", "tokens_out", "tokens_total", "trial_tokens", "paid_tokens",
+        "cost_usd", "balance_after", "usage_source", "status_code", "latency_ms",
+    ])
+    for r in rows:
+        writer.writerow([
+            r.get("created_at"), r.get("user_id"), r.get("username") or "", r.get("model"),
+            1 if r.get("is_premium") else 0,
+            r.get("tokens_in"), r.get("tokens_out"), r.get("tokens_used"),
+            r.get("trial_tokens"), r.get("paid_tokens"),
+            r.get("cost_usd"), r.get("balance_after"), r.get("usage_source"),
+            r.get("status_code"), r.get("latency_ms"),
+        ])
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="requests.csv"'},
+    )
 
 
 @pages_router.post("/api/user/regenerate-key")

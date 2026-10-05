@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException, Header, Depends
 from fastapi.responses import JSONResponse, StreamingResponse, Response
-from app.services.user_service import get_user_by_api_key, premium_trial_remaining
+from app.services.user_service import get_user_by_api_key, premium_trial_remaining, log_rejected_request
 from app.services.proxy_service import forward_chat_completion, fetch_upstream_models
 from app.core.catalog import is_premium_model
 
@@ -48,6 +48,7 @@ async def chat_completions(request: Request, user: dict = Depends(get_current_ap
     model = payload.get("model", "")
     if is_premium_model(model):
         if premium_trial_remaining(user["id"], model) <= 0 and float(user.get("balance") or 0) <= 0:
+            log_rejected_request(user["id"], model, 402)
             raise HTTPException(
                 status_code=402,
                 detail={"error": {

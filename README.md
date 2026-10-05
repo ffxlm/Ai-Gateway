@@ -196,6 +196,12 @@ docker compose up -d
 
 On the first startup after upgrading, any previous VIP payments recorded in `payment_transactions` are automatically converted into wallet credit (`amount_THB / USD_TO_THB`) and logged as a `migration` ledger entry. This runs once (guarded by the `wallet_migrated_v1` setting).
 
+### Atomic settlement & auditability
+
+- **Atomic settlement:** the trial counter, wallet debit, ledger entry and request-log snapshot for a request are written inside a single `BEGIN IMMEDIATE` transaction (`record_usage` in `app/services/user_service.py`). Concurrent requests for the same user can therefore neither double-grant the free trial nor lose a charge (no lost updates).
+- **Per-request audit log:** every request (including blocked `402`s) is recorded in `request_logs` with `tokens_in`/`tokens_out`, `trial_tokens`, `paid_tokens`, `cost_usd`, `is_premium`, `balance_after` and `usage_source` (`upstream`, `estimated`, or `rejected`). View it at **Admin → Request Log** (`/admin/requests`) with filters by user, model, date range, status and tier, plus **CSV export** and a **14-day free-trial history** per user/model.
+- **Wallet reconciliation:** **Admin → Wallet Reconciliation** compares each stored balance against the sum of that user's ledger entries (`expected = Σ credits + Σ debits`). A non-zero `Balance Diff` means a write bypassed the ledger and must be investigated.
+
 ---
 
 ## API Integration Examples

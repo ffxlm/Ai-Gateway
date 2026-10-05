@@ -112,7 +112,7 @@ def get_balance(user_id: str) -> float:
 def add_balance(user_id: str, amount_usd: float, tx_type: str = "topup",
                 description: str = "", trans_ref: str = "") -> float:
     """Credit (positive) or debit (negative) the wallet atomically. Returns the new balance."""
-    with db_session() as conn:
+    with db_session(immediate=True) as conn:
         cursor = conn.cursor()
         row = cursor.execute("SELECT balance FROM users WHERE id = ?", (user_id,)).fetchone()
         if not row:
@@ -132,75 +132,110 @@ def add_balance(user_id: str, amount_usd: float, tx_type: str = "topup",
         return new_balance
 
 def record_usage(user_id: str, model: str, tokens_in: int, tokens_out: int,
-                 latency_ms: float = 0.0, status_code: int = 200) -> float:
-    """Log a completed request.
+                 latency_ms: float = 0.0, status_code: int = 200,
+                 usage_source: str = "upstream") -> float:
+    """Log a completed request and settle its cost in one atomic transaction.
 
     Free models are never charged. Premium models consume the daily free trial
     first (input tokens, then output tokens); anything beyond the trial is billed
     from the wallet at the model's per-token rates.
+
+    The trial counter, wallet balance, ledger entry and request-log snapshot are
+    all written inside a single ``BEGIN IMMEDIATE`` transaction, so concurrent
+    requests for the same user cannot double-grant the trial or lose a charge.
 
     Returns the USD amount charged (0.0 for free models or trial-covered usage).
     """
     tokens_in = max(int(tokens_in or 0), 0)
     tokens_out = max(int(tokens_out or 0), 0)
     total_tokens = tokens_in + tokens_out
-    cost = 0.0
 
     is_premium = is_premium_model(model)
     limit = premium_trial_limit(model) if is_premium else 0
     today = get_today_str()
 
-    with db_session() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-        INSERT INTO request_logs (user_id, model, tokens_used, latency_ms, status_code)
-        VALUES (?, ?, ?, ?, ?)
-        """, (user_id, model, total_tokens, latency_ms, status_code))
+    cost = 0.0
+    trial_tokens = 0
+    paid_tokens = 0
+    paid_in = 0
+    paid_out = 0
+    balance_after = 0.0
 
-        if is_premium:
-            row = cursor.execute(
-                "SELECT balance FROM users WHERE id = ?",
-                (user_id,),
-            ).fetchone()
+    with db_session(immediate=True) as conn:
+        cursor = conn.cursor()
+        row = cursor.execute("SELECT balance FROM users WHERE id = ?", (user_id,)).fetchone()
+        if row:
+            balance_after = float(row["balance"] or 0)
+
+        if is_premium and row:
             used_row = cursor.execute(
                 "SELECT tokens_used FROM model_trial_usage WHERE user_id = ? AND model = ? AND usage_date = ?",
                 (user_id, model, today),
             ).fetchone()
-            if row:
-                used = int(used_row["tokens_used"]) if used_row else 0
+            used = int(used_row["tokens_used"]) if used_row else 0
 
-                # Apply this model's free trial: input tokens first, then output tokens.
-                remaining = max(limit - used, 0)
-                free_in = min(tokens_in, remaining)
-                remaining -= free_in
-                free_out = min(tokens_out, remaining)
-                paid_in = tokens_in - free_in
-                paid_out = tokens_out - free_out
+            # Apply this model's free trial: input tokens first, then output tokens.
+            remaining = max(limit - used, 0)
+            free_in = min(tokens_in, remaining)
+            remaining -= free_in
+            free_out = min(tokens_out, remaining)
+            paid_in = tokens_in - free_in
+            paid_out = tokens_out - free_out
+            trial_tokens = free_in + free_out
+            paid_tokens = paid_in + paid_out
 
-                cost = premium_price(model, paid_in, paid_out)
-                new_balance = float(row["balance"] or 0)
-                if cost > 0:
-                    new_balance -= cost
+            cost = premium_price(model, paid_in, paid_out)
+            if cost > 0:
+                balance_after -= cost
 
-                # Accumulate today's trial usage for this model only.
+            # Accumulate today's trial usage for this model only.
+            cursor.execute("""
+            INSERT INTO model_trial_usage (user_id, model, usage_date, tokens_used)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, model, usage_date)
+            DO UPDATE SET tokens_used = tokens_used + excluded.tokens_used
+            """, (user_id, model, today, total_tokens))
+
+            cursor.execute(
+                "UPDATE users SET balance = ?, total_spent = total_spent + ? WHERE id = ?",
+                (balance_after, cost, user_id),
+            )
+            if cost > 0:
                 cursor.execute("""
-                INSERT INTO model_trial_usage (user_id, model, usage_date, tokens_used)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(user_id, model, usage_date)
-                DO UPDATE SET tokens_used = tokens_used + excluded.tokens_used
-                """, (user_id, model, today, total_tokens))
+                INSERT INTO wallet_transactions
+                (user_id, tx_type, amount_usd, balance_after, description, model, tokens_in, tokens_out)
+                VALUES (?, 'usage', ?, ?, ?, ?, ?, ?)
+                """, (user_id, -cost, balance_after, f"{total_tokens:,} tokens", model, paid_in, paid_out))
 
-                cursor.execute(
-                    "UPDATE users SET balance = ?, total_spent = total_spent + ? WHERE id = ?",
-                    (new_balance, cost, user_id),
-                )
-                if cost > 0:
-                    cursor.execute("""
-                    INSERT INTO wallet_transactions
-                    (user_id, tx_type, amount_usd, balance_after, description, model, tokens_in, tokens_out)
-                    VALUES (?, 'usage', ?, ?, ?, ?, ?, ?)
-                    """, (user_id, -cost, new_balance, f"{total_tokens:,} tokens", model, paid_in, paid_out))
+        # Full per-request audit snapshot (written in the same transaction).
+        cursor.execute("""
+        INSERT INTO request_logs
+        (user_id, model, tokens_used, tokens_in, tokens_out, trial_tokens, paid_tokens,
+         cost_usd, is_premium, balance_after, usage_source, latency_ms, status_code)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, model, total_tokens, tokens_in, tokens_out, trial_tokens, paid_tokens,
+              cost, 1 if is_premium else 0, balance_after, usage_source, latency_ms, status_code))
+
     return cost
+
+
+def log_rejected_request(user_id: str, model: str, status_code: int) -> None:
+    """Record a request blocked before it reached upstream (e.g. HTTP 402).
+
+    Gives admins an auditable trail of enforcement: you can see exactly when a
+    user's trial ran out and their wallet was empty.
+    """
+    is_premium = is_premium_model(model)
+    with db_session(immediate=True) as conn:
+        cursor = conn.cursor()
+        row = cursor.execute("SELECT balance FROM users WHERE id = ?", (user_id,)).fetchone()
+        balance = float(row["balance"] or 0) if row else 0.0
+        cursor.execute("""
+        INSERT INTO request_logs
+        (user_id, model, tokens_used, tokens_in, tokens_out, trial_tokens, paid_tokens,
+         cost_usd, is_premium, balance_after, usage_source, latency_ms, status_code)
+        VALUES (?, ?, 0, 0, 0, 0, 0, 0, ?, ?, 'rejected', 0, ?)
+        """, (user_id, model, 1 if is_premium else 0, balance, status_code))
 
 def get_wallet_transactions(user_id: str, limit: int = 25) -> List[Dict[str, Any]]:
     with db_session() as conn:
@@ -375,3 +410,143 @@ def get_portal_analytics(time_range: str = "24h") -> Dict[str, Any]:
     data["active_days"] = active_days
     data["avg_per_day"] = int(data["all_time_tokens"] / active_days) if active_days > 0 else 0
     return data
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Auditing: per-request log, trial history, wallet reconciliation
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _request_log_filters(user_id=None, model=None, date_from=None, date_to=None,
+                         status=None, premium_only=False):
+    """Build the shared WHERE clause for the request-log views and CSV export."""
+    clauses, params = [], []
+    if user_id:
+        clauses.append("r.user_id = ?")
+        params.append(user_id)
+    if model:
+        clauses.append("r.model = ?")
+        params.append(model)
+    if date_from:
+        clauses.append("DATE(r.created_at) >= DATE(?)")
+        params.append(date_from)
+    if date_to:
+        clauses.append("DATE(r.created_at) <= DATE(?)")
+        params.append(date_to)
+    if status:
+        try:
+            clauses.append("r.status_code = ?")
+            params.append(int(status))
+        except (TypeError, ValueError):
+            pass
+    if premium_only:
+        clauses.append("r.is_premium = 1")
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    return where, params
+
+
+def count_request_logs(user_id=None, model=None, date_from=None, date_to=None,
+                       status=None, premium_only=False) -> int:
+    where, params = _request_log_filters(user_id, model, date_from, date_to, status, premium_only)
+    with db_session() as conn:
+        row = conn.cursor().execute(
+            f"SELECT COUNT(*) AS n FROM request_logs r{where}", params
+        ).fetchone()
+        return int(row["n"] or 0)
+
+
+def get_request_logs(user_id=None, model=None, date_from=None, date_to=None,
+                     status=None, premium_only=False, limit: int = 100,
+                     offset: int = 0) -> List[Dict[str, Any]]:
+    """Per-request audit rows, newest first, with the username joined in."""
+    where, params = _request_log_filters(user_id, model, date_from, date_to, status, premium_only)
+    with db_session() as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"""
+        SELECT r.*, u.username, u.avatar_url
+        FROM request_logs r
+        LEFT JOIN users u ON u.id = r.user_id
+        {where}
+        ORDER BY r.id DESC
+        LIMIT ? OFFSET ?
+        """, params + [int(limit), int(offset)])
+        return [dict(x) for x in cursor.fetchall()]
+
+
+def get_request_summary(user_id=None, model=None, date_from=None, date_to=None,
+                        status=None, premium_only=False) -> Dict[str, Any]:
+    """Totals for the current request-log filter (for the on-page summary row)."""
+    where, params = _request_log_filters(user_id, model, date_from, date_to, status, premium_only)
+    with db_session() as conn:
+        row = conn.cursor().execute(f"""
+        SELECT COUNT(*) AS requests,
+               COALESCE(SUM(r.tokens_used), 0) AS tokens_total,
+               COALESCE(SUM(r.tokens_in), 0) AS tokens_in,
+               COALESCE(SUM(r.tokens_out), 0) AS tokens_out,
+               COALESCE(SUM(r.trial_tokens), 0) AS trial_tokens,
+               COALESCE(SUM(r.paid_tokens), 0) AS paid_tokens,
+               COALESCE(SUM(r.cost_usd), 0) AS cost_usd
+        FROM request_logs r{where}
+        """, params).fetchone()
+        return dict(row)
+
+
+def get_trial_history(user_id=None, days: int = 14) -> List[Dict[str, Any]]:
+    """Daily trial consumption per user/model, newest first, with limit and % used."""
+    params = [f"-{int(days)} days"]
+    clause = ""
+    if user_id:
+        clause = "AND t.user_id = ?"
+        params.append(user_id)
+    with db_session() as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"""
+        SELECT t.user_id, t.model, t.usage_date, t.tokens_used,
+               u.username, u.avatar_url
+        FROM model_trial_usage t
+        LEFT JOIN users u ON u.id = t.user_id
+        WHERE t.usage_date >= DATE('now', 'localtime', ?) {clause}
+        ORDER BY t.usage_date DESC, t.tokens_used DESC
+        """, params)
+        rows = [dict(r) for r in cursor.fetchall()]
+    for r in rows:
+        limit = premium_trial_limit(r["model"])
+        r["limit"] = limit
+        r["pct"] = min(int((r["tokens_used"] / limit) * 100), 100) if limit > 0 else 0
+    return rows
+
+
+def get_reconciliation() -> List[Dict[str, Any]]:
+    """Compare each wallet's ledger-derived balance with the stored balance.
+
+    ``expected = Σ(ledger credits) + Σ(ledger debits)``. Any non-zero
+    ``balance_diff`` means a write bypassed the ledger and must be investigated.
+
+    ``spent_diff`` compares ``users.total_spent`` with the sum of per-request
+    ``cost_usd``; it is non-zero for premium usage that predates the audit
+    migration (those old request rows carry the column default 0).
+    """
+    with db_session() as conn:
+        cursor = conn.cursor()
+        users = [dict(r) for r in cursor.execute(
+            "SELECT id, username, avatar_url, balance, total_topped_up, total_spent "
+            "FROM users ORDER BY username COLLATE NOCASE"
+        ).fetchall()]
+        for u in users:
+            agg = cursor.execute("""
+                SELECT
+                    COALESCE(SUM(CASE WHEN amount_usd > 0 THEN amount_usd ELSE 0 END), 0) AS credits,
+                    COALESCE(SUM(CASE WHEN amount_usd < 0 THEN amount_usd ELSE 0 END), 0) AS debits
+                FROM wallet_transactions WHERE user_id = ?
+            """, (u["id"],)).fetchone()
+            expected = float(agg["credits"] or 0) + float(agg["debits"] or 0)
+            actual = float(u["balance"] or 0)
+            u["expected_balance"] = expected
+            u["actual_balance"] = actual
+            u["balance_diff"] = round(actual - expected, 8)
+
+            logged = cursor.execute(
+                "SELECT COALESCE(SUM(cost_usd), 0) AS n FROM request_logs WHERE user_id = ? AND is_premium = 1",
+                (u["id"],),
+            ).fetchone()["n"]
+            u["logged_cost"] = float(logged or 0)
+            u["spent_diff"] = round(float(u["total_spent"] or 0) - float(logged or 0), 8)
+        return users

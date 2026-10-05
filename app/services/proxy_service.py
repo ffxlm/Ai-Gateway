@@ -132,10 +132,13 @@ async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, header
             aggregated = _aggregate_sse(raw_text, model)
             if aggregated is not None:
                 tokens_in, tokens_out = _token_breakdown(aggregated.get("usage") or {})
+                source = "upstream"
                 if tokens_in == 0 and tokens_out == 0:
                     content = aggregated["choices"][0]["message"].get("content", "")
                     tokens_out = max(len(content) // 4 + 50, 100)
-                record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency, status_code=200)
+                    source = "estimated"
+                record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency,
+                             status_code=200, usage_source=source)
                 return 200, "application/json", json.dumps(aggregated).encode("utf-8")
 
         if "data: [DONE]" in raw_text:
@@ -152,11 +155,14 @@ async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, header
             clean_bytes = resp.content
 
         tokens_in, tokens_out = _token_breakdown(data.get("usage") or {})
+        source = "upstream"
         if tokens_in == 0 and tokens_out == 0:
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             tokens_out = max(len(content) // 4 + 50, 100)
+            source = "estimated"
 
-        record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency, status_code=200)
+        record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency,
+                     status_code=200, usage_source=source)
         return resp.status_code, "application/json", clean_bytes
     finally:
         await client.aclose()
@@ -192,11 +198,14 @@ async def handle_streaming_proxy(client: httpx.AsyncClient, url: str, headers: d
                             pass
 
             # Fallback estimation if upstream didn't send usage in stream
+            source = "upstream"
             if tokens_in == 0 and tokens_out == 0:
                 tokens_out = max(collected_chunks * 3, 50)
+                source = "estimated"
 
             latency = (time.time() - start_time) * 1000
-            record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency, status_code=200)
+            record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency,
+                         status_code=200, usage_source=source)
         finally:
             await resp.aclose()
             await client.aclose()

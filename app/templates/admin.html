@@ -29,6 +29,10 @@
                 </div>
             </div>
             <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
+                <a href="/admin/requests" class="px-2.5 sm:px-3 py-1.5 rounded-md bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-[11px] sm:text-xs font-medium transition flex items-center space-x-1.5" title="Per-request audit log">
+                    <i class="fa-solid fa-list-check text-[10px] text-cyan-400"></i>
+                    <span class="hidden sm:inline">Request Log</span>
+                </a>
                 <span class="text-xs text-zinc-400 font-mono"><span class="hidden sm:inline">Logged in as: </span><strong class="text-zinc-200">{{ user.username }}</strong></span>
                 <a href="/auth/logout" title="Sign Out" class="p-1.5 sm:p-2 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 rounded-md transition">
                     <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
@@ -324,12 +328,67 @@
                                 {% if t.amount_usd >= 0 %}+{% endif %}${{ t.amount_usd | usd }}
                             </td>
                             <td class="py-2.5 px-3 font-mono text-zinc-400">${{ t.balance_after | usd }}</td>
-                            <td class="py-2.5 px-3 text-[11px] text-zinc-400">{{ t.description }}{% if t.model %} · <span class="font-mono text-zinc-500">{{ t.model }}</span>{% endif %}</td>
+                            <td class="py-2.5 px-3 text-[11px] text-zinc-400">{{ t.description }}{% if t.model %} · <span class="font-mono text-zinc-500">{{ t.model }}</span>{% endif %}{% if t.tx_type == 'usage' %} · <span class="font-mono text-zinc-500">in {{ "{:,}".format(t.tokens_in or 0) }} / out {{ "{:,}".format(t.tokens_out or 0) }}</span>{% endif %}</td>
                             <td class="py-2.5 px-3 text-zinc-500 font-mono text-[11px]">{{ t.created_at }}</td>
                         </tr>
                         {% else %}
                         <tr>
                             <td colspan="6" class="py-6 text-center text-zinc-500">No wallet activity recorded yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section: Wallet Reconciliation -->
+        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+            <div class="flex items-center justify-between border-b border-zinc-800/80 pb-4">
+                <div>
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
+                        <i class="fa-solid fa-scale-balanced text-cyan-400"></i>
+                        <span>Wallet Reconciliation</span>
+                    </h2>
+                    <p class="text-xs text-zinc-400 mt-1">Stored balance vs the sum of the ledger. <span class="text-emerald-400">Diff must be $0.000000.</span></p>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
+                    <thead>
+                        <tr class="border-b border-zinc-800 text-[11px] text-zinc-400 uppercase tracking-wider font-semibold">
+                            <th class="py-2.5 px-3">User</th>
+                            <th class="py-2.5 px-3 text-right">Stored Balance</th>
+                            <th class="py-2.5 px-3 text-right">Ledger Expected</th>
+                            <th class="py-2.5 px-3 text-right">Balance Diff</th>
+                            <th class="py-2.5 px-3 text-right">Spent (recorded)</th>
+                            <th class="py-2.5 px-3 text-right">Cost in Logs</th>
+                            <th class="py-2.5 px-3 text-right">Spent Diff</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-800/60 text-zinc-300">
+                        {% for r in reconciliation %}
+                        <tr class="hover:bg-zinc-850/30 transition {% if r.balance_diff != 0 %}bg-rose-950/20{% endif %}">
+                            <td class="py-2.5 px-3">
+                                <div class="flex items-center space-x-2">
+                                    <img src="{{ r.avatar_url or 'https://cdn.discordapp.com/embed/avatars/0.png' }}" class="w-5 h-5 rounded-full">
+                                    <span class="font-medium text-zinc-200">{{ r.username or r.id }}</span>
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono text-emerald-400">${{ r.actual_balance | usd }}</td>
+                            <td class="py-2.5 px-3 text-right font-mono text-zinc-300">${{ r.expected_balance | usd }}</td>
+                            <td class="py-2.5 px-3 text-right font-mono font-bold {% if r.balance_diff != 0 %}text-rose-400{% else %}text-emerald-400{% endif %}">
+                                {% if r.balance_diff != 0 %}{{ r.balance_diff }}{% else %}OK{% endif %}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono text-amber-300">${{ r.total_spent | usd }}</td>
+                            <td class="py-2.5 px-3 text-right font-mono text-zinc-300">${{ r.logged_cost | usd }}</td>
+                            <td class="py-2.5 px-3 text-right font-mono {% if r.spent_diff != 0 %}text-zinc-500{% else %}text-emerald-400{% endif %}" title="Non-zero only for premium usage recorded before the audit migration">
+                                {% if r.spent_diff != 0 %}{{ r.spent_diff }}{% else %}OK{% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="py-6 text-center text-zinc-500">No users yet.</td>
                         </tr>
                         {% endfor %}
                     </tbody>

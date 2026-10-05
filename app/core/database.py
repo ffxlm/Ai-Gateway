@@ -11,13 +11,32 @@ def get_db_connection():
     return conn
 
 @contextlib.contextmanager
-def db_session():
+def db_session(immediate: bool = False):
+    """Yield a connection inside a transaction.
+
+    ``immediate=True`` takes SQLite's write lock up front (``BEGIN IMMEDIATE``).
+    That serialises read-modify-write sequences such as wallet debits and trial
+    counters, so two concurrent requests for the same user can neither lose a
+    charge (lost update) nor double-spend the free daily trial.
+    """
     conn = get_db_connection()
+    if immediate:
+        conn.isolation_level = None  # take manual control of the transaction
+        conn.execute("BEGIN IMMEDIATE")
     try:
         yield conn
-        conn.commit()
+        if immediate:
+            conn.execute("COMMIT")
+        else:
+            conn.commit()
     except Exception:
-        conn.rollback()
+        if immediate:
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
+        else:
+            conn.rollback()
         raise
     finally:
         conn.close()
@@ -128,6 +147,28 @@ def init_db():
             cursor.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?);", (k, v))
 
         _migrate_wallet(cursor)
+        _migrate_observability(cursor)
+
+
+def _migrate_observability(cursor):
+    """Add per-request audit columns so every request is fully inspectable.
+
+    Idempotent: only adds columns that do not already exist, so it is safe to run
+    on every start and on older databases (existing rows get the column defaults).
+    """
+    existing = {row["name"] for row in cursor.execute("PRAGMA table_info(request_logs)").fetchall()}
+    for column, ddl in (
+        ("tokens_in", "INTEGER DEFAULT 0"),
+        ("tokens_out", "INTEGER DEFAULT 0"),
+        ("trial_tokens", "INTEGER DEFAULT 0"),
+        ("paid_tokens", "INTEGER DEFAULT 0"),
+        ("cost_usd", "REAL DEFAULT 0"),
+        ("is_premium", "INTEGER DEFAULT 0"),
+        ("balance_after", "REAL DEFAULT 0"),
+        ("usage_source", "TEXT DEFAULT ''"),
+    ):
+        if column not in existing:
+            cursor.execute(f"ALTER TABLE request_logs ADD COLUMN {column} {ddl}")
 
 
 def _migrate_wallet(cursor):

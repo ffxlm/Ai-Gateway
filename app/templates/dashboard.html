@@ -408,6 +408,9 @@
                         <div class="min-w-0">
                             <div class="text-xs font-medium text-zinc-200 truncate">{{ t.description or t.tx_type|capitalize }}</div>
                             <div class="text-[10px] text-zinc-500 font-mono">{{ t.created_at }}</div>
+                            {% if t.tx_type == 'usage' %}
+                            <div class="text-[10px] text-amber-400/80 font-mono mt-0.5">in {{ "{:,}".format(t.tokens_in or 0) }} · out {{ "{:,}".format(t.tokens_out or 0) }}{% if t.model %} · {{ t.model }}{% endif %}</div>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="text-right shrink-0">
