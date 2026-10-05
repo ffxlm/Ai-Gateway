@@ -336,11 +336,13 @@
                     </h2>
                     <p class="text-xs text-zinc-400 mt-1">Unlimited usage at no cost via <code class="text-zinc-300 font-mono text-[11px] bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800">/v1/chat/completions</code>. Click any model ID to copy.</p>
                 </div>
-                <!-- Search input -->
+                <!-- Search input (only worth showing once the list is long) -->
+                {% if models|length > 6 %}
                 <div class="relative w-full sm:w-64">
                     <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-zinc-500 text-xs"></i>
                     <input type="text" id="model-search" oninput="filterModels()" placeholder="Search models..." class="w-full bg-zinc-950 border border-zinc-800 rounded-md pl-8 pr-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-700">
                 </div>
+                {% endif %}
             </div>
 
             <!-- Models Grid -->
@@ -738,7 +740,9 @@
 
         // ─── Filter models ───
         function filterModels() {
-            const query = document.getElementById('model-search').value.toLowerCase().trim();
+            const searchInput = document.getElementById('model-search');
+            if (!searchInput) return;  // hidden when the model list is short
+            const query = searchInput.value.toLowerCase().trim();
             document.querySelectorAll('#models-grid .model-item').forEach(item => {
                 const model = (item.getAttribute('data-model') || '').toLowerCase();
                 const text = item.textContent.toLowerCase();
