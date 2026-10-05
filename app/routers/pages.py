@@ -12,7 +12,7 @@ from app.services.user_service import (
     get_all_users, get_portal_stats, get_user_analytics, get_portal_analytics,
     add_balance, get_wallet_transactions, get_all_wallet_transactions,
     premium_trial_status, count_request_logs, get_request_logs,
-    get_trial_history, get_reconciliation, get_request_summary,
+    get_trial_history, get_reconciliation, get_request_summary, find_user_ids,
 )
 from app.services.payment_service import (
     generate_promptpay_payload, generate_qr_data_url, verify_slip_with_slipok, is_trans_ref_used,
@@ -118,8 +118,13 @@ def _parse_request_filters(request: Request) -> dict:
     status = (q.get("status") or "").strip()
     if not status.isdigit():
         status = None
+    user_id = (q.get("user_id") or "").strip() or None
+    user_q = (q.get("user_q") or "").strip() or None
+    if user_id:
+        user_q = None  # an exact id (e.g. from a deep link) wins over the search box
     return {
-        "user_id": (q.get("user_id") or "").strip() or None,
+        "user_id": user_id,
+        "user_q": user_q,
         "model": (q.get("model") or "").strip() or None,
         "date_from": (q.get("date_from") or "").strip() or None,
         "date_to": (q.get("date_to") or "").strip() or None,
@@ -260,8 +265,16 @@ async def admin_requests_page(request: Request):
 
     total = count_request_logs(**filters)
     logs = get_request_logs(**filters, limit=per_page, offset=offset)
-    trial_history = get_trial_history(user_id=filters["user_id"], days=14)
     summary = get_request_summary(**filters)
+
+    # Trial history follows the same user filter (resolved from the search box).
+    if filters["user_id"]:
+        trial_user_ids = [filters["user_id"]]
+    elif filters["user_q"]:
+        trial_user_ids = find_user_ids(filters["user_q"])
+    else:
+        trial_user_ids = None
+    trial_history = get_trial_history(user_ids=trial_user_ids, days=14)
 
     return templates.TemplateResponse(request, "admin_requests.html", {
         "user": user,
@@ -272,7 +285,6 @@ async def admin_requests_page(request: Request):
         "pages": max((total + per_page - 1) // per_page, 1),
         "filters": filters,
         "summary": summary,
-        "all_users": get_all_users(),
         "model_options": FREE_MODELS + [m["id"] for m in PREMIUM_MODELS],
         "trial_history": trial_history,
         "usd_to_thb": _usd_rate(),

@@ -415,13 +415,38 @@ def get_portal_analytics(time_range: str = "24h") -> Dict[str, Any]:
 # Auditing: per-request log, trial history, wallet reconciliation
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _request_log_filters(user_id=None, model=None, date_from=None, date_to=None,
-                         status=None, premium_only=False):
+def find_user_ids(term: str, limit: int = 500) -> List[str]:
+    """Resolve a partial username or ID to matching user ids (for search filters).
+
+    Keeps the Request Log usable with thousands of users: admins type a few
+    characters instead of scrolling a huge dropdown.
+    """
+    term = (term or "").strip()
+    if not term:
+        return []
+    like = f"%{term}%"
+    with db_session() as conn:
+        rows = conn.cursor().execute(
+            "SELECT id FROM users WHERE username LIKE ? OR id LIKE ? ORDER BY username COLLATE NOCASE LIMIT ?",
+            (like, like, int(limit)),
+        ).fetchall()
+        return [r["id"] for r in rows]
+
+
+def _request_log_filters(user_id=None, user_q=None, model=None, date_from=None,
+                         date_to=None, status=None, premium_only=False):
     """Build the shared WHERE clause for the request-log views and CSV export."""
     clauses, params = [], []
     if user_id:
         clauses.append("r.user_id = ?")
         params.append(user_id)
+    elif user_q:
+        ids = find_user_ids(user_q)
+        if not ids:
+            clauses.append("1 = 0")
+        else:
+            clauses.append("r.user_id IN (" + ",".join(["?"] * len(ids)) + ")")
+            params.extend(ids)
     if model:
         clauses.append("r.model = ?")
         params.append(model)
@@ -443,9 +468,9 @@ def _request_log_filters(user_id=None, model=None, date_from=None, date_to=None,
     return where, params
 
 
-def count_request_logs(user_id=None, model=None, date_from=None, date_to=None,
+def count_request_logs(user_id=None, user_q=None, model=None, date_from=None, date_to=None,
                        status=None, premium_only=False) -> int:
-    where, params = _request_log_filters(user_id, model, date_from, date_to, status, premium_only)
+    where, params = _request_log_filters(user_id, user_q, model, date_from, date_to, status, premium_only)
     with db_session() as conn:
         row = conn.cursor().execute(
             f"SELECT COUNT(*) AS n FROM request_logs r{where}", params
@@ -453,11 +478,11 @@ def count_request_logs(user_id=None, model=None, date_from=None, date_to=None,
         return int(row["n"] or 0)
 
 
-def get_request_logs(user_id=None, model=None, date_from=None, date_to=None,
+def get_request_logs(user_id=None, user_q=None, model=None, date_from=None, date_to=None,
                      status=None, premium_only=False, limit: int = 100,
                      offset: int = 0) -> List[Dict[str, Any]]:
     """Per-request audit rows, newest first, with the username joined in."""
-    where, params = _request_log_filters(user_id, model, date_from, date_to, status, premium_only)
+    where, params = _request_log_filters(user_id, user_q, model, date_from, date_to, status, premium_only)
     with db_session() as conn:
         cursor = conn.cursor()
         cursor.execute(f"""
@@ -471,10 +496,10 @@ def get_request_logs(user_id=None, model=None, date_from=None, date_to=None,
         return [dict(x) for x in cursor.fetchall()]
 
 
-def get_request_summary(user_id=None, model=None, date_from=None, date_to=None,
+def get_request_summary(user_id=None, user_q=None, model=None, date_from=None, date_to=None,
                         status=None, premium_only=False) -> Dict[str, Any]:
     """Totals for the current request-log filter (for the on-page summary row)."""
-    where, params = _request_log_filters(user_id, model, date_from, date_to, status, premium_only)
+    where, params = _request_log_filters(user_id, user_q, model, date_from, date_to, status, premium_only)
     with db_session() as conn:
         row = conn.cursor().execute(f"""
         SELECT COUNT(*) AS requests,
@@ -489,13 +514,19 @@ def get_request_summary(user_id=None, model=None, date_from=None, date_to=None,
         return dict(row)
 
 
-def get_trial_history(user_id=None, days: int = 14) -> List[Dict[str, Any]]:
-    """Daily trial consumption per user/model, newest first, with limit and % used."""
+def get_trial_history(user_ids=None, days: int = 14) -> List[Dict[str, Any]]:
+    """Daily trial consumption per user/model, newest first, with limit and % used.
+
+    ``user_ids`` may be a list (from a username search) or None for everyone.
+    An explicit empty list means "no matching user", so nothing is returned.
+    """
+    if user_ids is not None and not user_ids:
+        return []
     params = [f"-{int(days)} days"]
     clause = ""
-    if user_id:
-        clause = "AND t.user_id = ?"
-        params.append(user_id)
+    if user_ids:
+        clause = "AND t.user_id IN (" + ",".join(["?"] * len(user_ids)) + ")"
+        params.extend(user_ids)
     with db_session() as conn:
         cursor = conn.cursor()
         cursor.execute(f"""
