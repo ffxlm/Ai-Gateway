@@ -1,14 +1,26 @@
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
+from zoneinfo import ZoneInfo
 from app.core.database import db_session, get_setting
 from app.core.config import settings
 
 def generate_api_key() -> str:
     return f"sk-portal-{secrets.token_urlsafe(32)}"
 
+def now_local() -> datetime:
+    """Naive wall-clock time in the configured business timezone (default Asia/Bangkok).
+
+    Kept naive on purpose so it stays comparable with timestamps stored as naive
+    local strings (e.g. vip_expires_at) and SQLite's datetime('now','localtime').
+    """
+    try:
+        return datetime.now(ZoneInfo(settings.TIMEZONE)).replace(tzinfo=None)
+    except Exception:
+        return datetime.now()
+
 def get_today_str() -> str:
-    return datetime.now().strftime("%Y-%m-%d")
+    return now_local().strftime("%Y-%m-%d")
 
 def get_or_create_user(discord_id: str, username: str, avatar_url: str = "", role: str = "user") -> Dict[str, Any]:
     today = get_today_str()
@@ -63,11 +75,37 @@ def get_user_by_api_key(api_key: str) -> Optional[Dict[str, Any]]:
             user["last_usage_date"] = today
         return user
 
+def apply_daily_rollover(user: Dict[str, Any]) -> Dict[str, Any]:
+    """Reset a single user's daily usage if the business date has changed.
+
+    Used by read paths (e.g. the dashboard session lookup) that do not go through
+    the API-key / login flow, so the UI reflects the reset immediately after midnight.
+    """
+    today = get_today_str()
+    if user.get("last_usage_date") != today:
+        with db_session() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET daily_token_usage = 0, last_usage_date = ? WHERE id = ?", (today, user["id"]))
+        user["daily_token_usage"] = 0
+        user["last_usage_date"] = today
+    return user
+
+def reset_all_stale_quota() -> int:
+    """Reset daily usage for every user whose last_usage_date is not the current business date.
+
+    Called on startup and by the midnight scheduler in app.main.
+    """
+    today = get_today_str()
+    with db_session() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET daily_token_usage = 0, last_usage_date = ? WHERE last_usage_date != ?", (today, today))
+        return cursor.rowcount
+
 def is_vip_active(user: Dict[str, Any]) -> bool:
     if user.get("tier") == "vip" and user.get("vip_expires_at"):
         try:
             exp = datetime.fromisoformat(user["vip_expires_at"])
-            return exp > datetime.now()
+            return exp > now_local()
         except Exception:
             return False
     return False
@@ -123,12 +161,12 @@ def add_vip_days(user_id: str, days: int) -> str:
         if row["vip_expires_at"]:
             try:
                 parsed = datetime.fromisoformat(row["vip_expires_at"])
-                if parsed > datetime.now():
+                if parsed > now_local():
                     current_exp = parsed
             except Exception:
                 pass
         
-        start_time = current_exp if current_exp else datetime.now()
+        start_time = current_exp if current_exp else now_local()
         new_exp = start_time + timedelta(days=days)
         new_exp_str = new_exp.isoformat()
         
@@ -185,7 +223,7 @@ def get_portal_stats() -> Dict[str, Any]:
         cursor.execute("SELECT COUNT(*) AS total_users FROM users")
         total_users = cursor.fetchone()["total_users"]
         
-        cursor.execute("SELECT COUNT(*) AS total_vip FROM users WHERE tier = 'vip' AND vip_expires_at > ?", (datetime.now().isoformat(),))
+        cursor.execute("SELECT COUNT(*) AS total_vip FROM users WHERE tier = 'vip' AND vip_expires_at > ?", (now_local().isoformat(),))
         total_vip = cursor.fetchone()["total_vip"]
         
         cursor.execute("SELECT SUM(daily_token_usage) AS total_tokens_today FROM users WHERE last_usage_date = ?", (today,))
@@ -202,7 +240,7 @@ def get_portal_stats() -> Dict[str, Any]:
         }
 
 def get_user_analytics(user_id: str, time_range: str = "24h") -> Dict[str, Any]:
-    now = datetime.now()
+    now = now_local()
     with db_session() as conn:
         cursor = conn.cursor()
         

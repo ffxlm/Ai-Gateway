@@ -9,6 +9,8 @@ class Settings:
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8080"))
     SECRET_KEY: str = os.getenv("SECRET_KEY", "super-secret-key-change-in-production-123456789")
+    # Business timezone used for daily quota rollover (00:00 local time)
+    TIMEZONE: str = os.getenv("TIMEZONE", "Asia/Bangkok")
     
     # Database
     DATABASE_PATH: str = os.path.join(BASE_DIR, "portal.db")

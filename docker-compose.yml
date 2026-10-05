@@ -10,3 +10,4 @@ services:
       - ./portal.db:/app/portal.db
     environment:
       - PYTHONUNBUFFERED=1
+      - TZ=Asia/Bangkok

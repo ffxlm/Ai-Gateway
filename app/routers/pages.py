@@ -7,7 +7,7 @@ from app.core.database import db_session, get_setting, update_setting
 from app.services.user_service import (
     get_or_create_user, regenerate_user_key, add_vip_days, revoke_vip, delete_user,
     toggle_user_ban, reset_user_quota, get_all_users, get_portal_stats, is_vip_active,
-    get_user_analytics
+    get_user_analytics, apply_daily_rollover
 )
 from app.services.payment_service import (
     generate_promptpay_payload, generate_qr_data_url, verify_slip_with_slipok, is_trans_ref_used,
@@ -28,7 +28,11 @@ def get_session_user(request: Request):
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        user = dict(row) if row else None
+    if not user:
+        return None
+    # Apply the daily quota rollover so the dashboard shows the reset right after midnight.
+    return apply_daily_rollover(user)
 
 @pages_router.get("/", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
