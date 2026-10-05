@@ -1,132 +1,133 @@
 # Ai Gateway
 
-> **High-Concurrency OpenAI-Compatible LLM Reverse Proxy & Subscription Portal**  
-> ออกแบบและพัฒนาตามหลักวิศวกรรมซอฟต์แวร์ (Decoupled Architecture, Non-blocking I/O, Atomic Token Metering) สำหรับแจกโควตา API รายวัน (5,000,000 Tokens) และปล่อยเช่า VIP แบบ Unlimited ผ่านการเชื่อมต่อเข้ากับ **9Router** ตัวเดียว
+> **High-Concurrency [OI]-Compatible LLM Reverse Proxy & Subscription Portal**
+> Built on solid software engineering principles (decoupled architecture, non-blocking I/O, atomic token metering) to hand out daily API quotas (5,000,000 tokens) and rent out Unlimited VIP access through a single **9Router** connection.
 
 ---
 
-## จุดเด่นของระบบ (Core Features)
+## Core Features
 
-1. **OpenAI API Standard Compatibility (100%):**
-   - รองรับ Endpoint มาตรฐาน `/v1/chat/completions` และ `/v1/models`
-   - ใช้งานได้ทันทีกับ **Cursor IDE, Cline (VS Code), NextChat, LibreChat, Chatbox** และ OpenAI SDKs (Python, Node.js, Go)
-   - รองรับการตอบกลับแบบเรียลไทม์ **Streaming (Server-Sent Events - SSE)** กินแรมเซิร์ฟเวอร์ต่ำคงที่ $O(1)$
-2. **ระบบสมาชิก & Discord OAuth2:**
-   - เข้าสู่ระบบด้วยบัญชี Discord ปลอดภัย ได้รับ User API Key ส่วนตัว (`sk-portal-...`) ทันทีหลังล็อกอิน
-   - มีระบบจดจำสิทธิ์ Superadmin อัตโนมัติสำหรับเจ้าของระบบ
-3. **ระบบจัดการโควตา & Tier (Atomic Metering):**
-   - **สายฟรี (Free Tier):** ได้รับ **5,000,000 Tokens / วัน** รีเซ็ตอัตโนมัติทุกเที่ยงคืน (00:00 น.)
-   - **สายเช่า VIP (Daily / Weekly Pass):** ใช้งาน Token ได้ไม่จำกัด 100% พร้อมช่องทางลัดความเร็วสูง (Priority Routing Queue)
-4. **Usage Analytics & กราฟแสดงสถิติจริง (Chart.js):**
-   - แสดงสถิติการใช้งาน Token ย้อนหลัง 24 ชั่วโมง, 7 วัน และ 30 วัน
-   - กราฟแท่ง Interactive คำนวณจากประวัติคำขอจริงในฐานข้อมูล SQLite
-5. **หน้าบ้านระดับ Production (Clean Dark Zinc SaaS):**
-   - ดีไซน์สไตล์ Developer Console เรียบหรู สะอาดตา ไม่ใช้อิโมจิ
-   - ใช้ไอคอนคมชัดจาก **Font Awesome 6**
-   - รองรับ **Responsive 100%** ทั้งบนมือถือและหน้าจอคอมพิวเตอร์
-   - ระบบ **Universal Clipboard Copy** ก๊อปปี้คีย์และชื่อโมเดลได้ทันที
-6. **หน้าหลังบ้านแอดมิน (Admin Control Center):**
-   - สลับมุมมอง Admin Panel และ User View ได้แบบ Real-time บนแถบ Header
-   - จัดการสมาชิก: เพิ่มวัน VIP (`+1d`, `+7d`), ปลด VIP (`Revoke VIP`), รีเซ็ตโควตารายวัน (`Reset Quota`), แบน/ปลดแบน และลบบัญชี (`Delete User`)
-   - ปรับแต่งการตั้งค่าระบบสดผ่านหน้าเว็บ (จำนวนแจกฟรี, URL/Key ของ 9Router, ราคาแพ็กเกจ, ลิงก์ Discord)
-7. **เชื่อมต่อ 9Router ตัวเดียว:**
-   - ทำหน้าที่เป็น Reverse Proxy กระจายคำขอต่อไปยัง 9Router Master รับภาระการโหลดบาลานซ์และสลับคีย์ AI
+1. **[OI] API Standard Compatibility (100%):**
+   - Supports the standard `/v1/chat/completions` and `/v1/models` endpoints.
+   - Works out of the box with **Cursor IDE, Cline (VS Code), NextChat, LibreChat, Chatbox**, and [OI] SDKs (Python, Node.js, Go).
+   - Supports real-time **Streaming (Server-Sent Events - SSE)** responses with low, constant $O(1)$ server memory usage.
+2. **Membership System & Discord OAuth2:**
+   - Sign in securely with a Discord account and receive a personal User API Key (`sk-portal-...`) immediately after login.
+   - Automatic Superadmin recognition for the system owner.
+3. **Quota & Tier Management (Atomic Metering):**
+   - **Free Tier:** **5,000,000 tokens / day**, automatically reset every midnight (00:00).
+   - **VIP Pass (Daily / Weekly):** 100% unlimited token usage with a high-speed Priority Routing Queue.
+4. **Usage Analytics & Real Statistics Charts (Chart.js):**
+   - Displays token usage history for the last 24 hours, 7 days, and 30 days.
+   - Interactive bar charts computed from real request history stored in SQLite.
+5. **Production-Grade Frontend (Clean Dark Zinc SaaS):**
+   - A polished, clean Developer Console design with no emoji clutter.
+   - Crisp icons from **Font Awesome 6**.
+   - **100% Responsive** across mobile and desktop.
+   - **Universal Clipboard Copy** to instantly copy keys and model names.
+6. **Admin Control Center:**
+   - Switch between Admin Panel and User View in real time from the header bar.
+   - Member management: add VIP days (`+1d`, `+7d`), revoke VIP (`Revoke VIP`), reset daily quota (`Reset Quota`), ban/unban, and delete accounts (`Delete User`).
+   - Edit live system settings from the web UI (free quota amount, 9Router URL/Key, package pricing, Discord link).
+7. **Single 9Router Connection:**
+   - Acts as a reverse proxy that forwards requests to the 9Router Master, offloading load balancing and AI key rotation.
 
 ---
 
-## สถาปัตยกรรมระบบ (System Architecture)
+## System Architecture
 
 ```mermaid
 flowchart TD
-    Client([ผู้ใช้งาน: Cursor / NextChat / Python]) -->|Authorization: Bearer sk-portal-...| Gateway[FastAPI Gateway Engine]
-    
-    Gateway --> Auth[ตรวจสิทธิ์ & ความถูกต้องของ User Key]
-    Auth --> Quota[ตรวจโควตารายวัน / สิทธิ์ VIP ใน SQLite WAL]
-    
-    Quota -->|ผ่านการตรวจโควตา| Stream[Non-blocking SSE Proxy Engine]
-    
+    Client([Client: Cursor / NextChat / Python]) -->|Authorization: Bearer sk-portal-...| Gateway[FastAPI Gateway Engine]
+
+    Gateway --> Auth[Validate User Key & Permissions]
+    Auth --> Quota[Check Daily Quota / VIP Status in SQLite WAL]
+
+    Quota -->|Quota check passed| Stream[Non-blocking SSE Proxy Engine]
+
     Stream -->|Authorization: Bearer Master 9Router Key| Router9[9Router Core: api.thirx.com]
-    
-    Router9 --> ModelPool[คลังโมเดล AI: DeepSeek, xAI, Qwen, GLM]
+
+    Router9 --> ModelPool[AI Model Pool: DeepSeek, xAI, Qwen, GLM]
     ModelPool -->|Stream Chunks| Router9
     Router9 -->|Stream Chunks| Gateway
     Gateway -->|Atomic Token Metering| DB[(SQLite WAL: portal.db)]
-    Gateway -->|Stream กลับทันที| Client
+    Gateway -->|Stream back immediately| Client
 ```
 
 ---
 
-## โมเดลที่เปิดให้บริการ (Supported Models Catalog)
+## Supported Models Catalog
 
-ระบบถูกล็อกและเปิดให้บริการเฉพาะ 7 โมเดลหลักจาก 9Router:
+The system is locked to exactly 7 core models served through 9Router:
 
-| รหัสโมเดล (Model ID) | ค่ายผู้พัฒนา (Provider) | คุณสมบัติเด่น |
+| Model ID | Provider | Highlights |
 |---|---|---|
-| `deepseek-v4-flash` | DeepSeek | ประมวลผลรวดเร็ว เขียนโค้ดแม่นยำ และตอบคำถามทั่วไป |
-| `GLM-5.3-Flash` | ZHIPU AI | โมเดลความเร็วสูง รองรับภาษาไทยและเอกสารขนาดยาว |
-| `grok-4.7` | xAI | ฉลาด ทันสมัย วิเคราะห์ข้อมูลเชิงลึกได้ดี |
-| `grok-4.7-xhigh` | xAI | โมเดลตัวท็อป ความสามารถด้านการคิดและใช้เหตุผลขั้นสูง |
-| `qwen3.8-27b` | Alibaba Qwen | เชี่ยวชาญงานเขียน Logic และคณิตศาสตร์ |
-| `MiniMax-M2.7` | MiniMax | โมเดลภาษาคุณภาพสูง บริบทกว้าง |
-| `muse-spark-1.3` | Muse | โมเดลขนาดกะทัดรัด ทำงานรวดเร็ว ตอบสนองในเสี้ยววินาที |
+| `deepseek-v4-flash` | DeepSeek | Fast inference, accurate code generation, and general Q&A |
+| `GLM-5.3-Flash` | ZHIPU AI | High-speed model supporting Thai and long documents |
+| `grok-4.7` | xAI | Smart and modern, strong at in-depth data analysis |
+| `grok-4.7-xhigh` | xAI | Flagship model with advanced reasoning capabilities |
+| `qwen3.8-27b` | Alibaba Qwen | Excels at writing logic and mathematics |
+| `MiniMax-M2.7` | MiniMax | High-quality language model with a wide context window |
+| `muse-spark-1.3` | Muse | Compact, fast model with sub-second responses |
 
 ---
 
-## โครงสร้างโฟลเดอร์ (Directory Structure)
+## Directory Structure
 
 ```text
 api-portal/
 ├── app/
 │   ├── core/
-│   │   ├── config.py          # การโหลด Environment Variables & Superadmin Binding
-│   │   └── database.py        # ฐานข้อมูล SQLite WAL Mode (High Concurrency)
+│   │   ├── config.py          # Environment variable loading & Superadmin binding
+│   │   └── database.py        # SQLite WAL mode database (high concurrency)
 │   ├── routers/
-│   │   ├── auth.py            # Discord OAuth2 Authentication
-│   │   ├── gateway.py         # OpenAI Compatible /v1 Endpoints
-│   │   └── pages.py           # Dashboard, Admin & Analytics API Routes
+│   │   ├── auth.py            # Discord OAuth2 authentication
+│   │   ├── gateway.py         # [OI]-compatible /v1 endpoints
+│   │   └── pages.py           # Dashboard, Admin & Analytics API routes
 │   ├── services/
-│   │   ├── proxy_service.py   # Streaming Proxy & Upstream Communication
-│   │   └── user_service.py    # จัดการบัญชี, Token Metering, Analytics และ VIP
+│   │   ├── proxy_service.py   # Streaming proxy & upstream communication
+│   │   └── user_service.py    # Accounts, token metering, analytics, and VIP
 │   ├── templates/
-│   │   ├── admin.html         # หน้าหลังบ้านแอดมิน
-│   │   ├── dashboard.html     # หน้าแดชบอร์ดลูกค้า & Usage Analytics
-│   │   └── login.html         # หน้าเข้าสู่ระบบ (Unified Single Card)
-│   └── main.py                # จุดเริ่มต้น FastAPI Application
+│   │   ├── admin.html         # Admin control center
+│   │   ├── dashboard.html     # Customer dashboard & usage analytics
+│   │   └── login.html         # Sign-in page (unified single card)
+│   └── main.py                # FastAPI application entry point
 ├── Dockerfile                 # Docker build container image
-├── docker-compose.yml         # 1-Command production runner
+├── docker-compose.yml         # One-command production runner
 ├── requirements.txt           # Python dependencies
-├── .env.example               # ตัวอย่างไฟล์ตั้งค่า
-├── start.sh                   # สคริปต์เปิดเซิร์ฟเวอร์
-└── stop.sh                    # สคริปต์ปิดเซิร์ฟเวอร์
+├── .env.example               # Example configuration file
+├── start.sh                   # Server startup script
+└── stop.sh                    # Server shutdown script
 ```
 
 ---
 
-## การติดตั้งและเริ่มใช้งาน (Quick Start)
+## Installation & Quick Start
 
-### 1. ติดตั้ง Dependencies และตั้งค่า Environment
+### 1. Install Dependencies and Configure the Environment
 
 ```bash
-# โคลน Repository
+# Clone the repository
 git clone https://github.com/ffxlm/Ai-Gateway.git
 cd Ai-Gateway
 
-# สร้าง Virtual Environment
+# Create a virtual environment
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# สร้างไฟล์คอนฟิก .env
+# Create the config file
 cp .env.example .env
 ```
 
-### 2. ตั้งค่าไฟล์ `.env`
+### 2. Configure the `.env` File
 
 ```ini
 # ─── Server Configuration ───
 HOST="0.0.0.0"
 PORT=8080
 SECRET_KEY="your-random-secret-key"
+TIMEZONE="Asia/Bangkok"
 
 # ─── 9Router Master Connection ───
 MASTER_ROUTER_URL="https://api.thirx.com"
@@ -150,39 +151,51 @@ VIP_DAILY_PRICE=10
 VIP_WEEKLY_PRICE=50
 ```
 
-### 3. เปิดใช้งานเซิร์ฟเวอร์
+### 3. Start the Server
 
-#### วิธีที่ 1: รันด้วยสคริปต์พื้นฐาน (Local / VPS)
+#### Option 1: Run with the basic scripts (Local / VPS)
 ```bash
-# เปิดเซิร์ฟเวอร์
+# Start the server
 ./start.sh
 
-# ปิดเซิร์ฟเวอร์
+# Stop the server
 ./stop.sh
 ```
 
-#### วิธีที่ 2: รันด้วย Docker Compose (แนะนำสำหรับ VPS)
+#### Option 2: Run with Docker Compose (recommended for VPS)
 ```bash
 docker compose up -d
 ```
 
 ---
 
-## วิธีนำ API ไปใช้งาน (Integration Examples)
+## Daily Quota Reset
 
-### Python (OpenAI Official SDK)
+Free-tier token usage is reset to `0` at **00:00 in the configured `TIMEZONE`** (default `Asia/Bangkok`). This is enforced in three complementary ways:
+
+- **Midnight scheduler** — a background task in `app/main.py` (`daily_quota_reset_loop`) wakes at the next local midnight and resets every stale user.
+- **Startup catch-up** — on boot, `reset_all_stale_quota()` resets any user whose `last_usage_date` is behind, covering downtime across midnight.
+- **Lazy rollover** — read paths (`get_user_by_api_key`, `get_or_create_user`, and the dashboard session lookup via `apply_daily_rollover`) also reset a user when their usage date is stale, so the UI and API always reflect the current day.
+
+> When deploying with Docker, the image sets `TZ=Asia/Bangkok` so the reset happens at local midnight rather than UTC.
+
+---
+
+## API Integration Examples
+
+### Python ([OI] Official SDK)
 
 ```python
-from openai import OpenAI
+from openai import [OI]
 
-client = OpenAI(
-    base_url="http://localhost:8080/v1",  # หรือโดเมนจริง https://api.yourdomain.com/v1
+client = [OI](
+    base_url="http://localhost:8080/v1",  # or the real domain, e.g. https://api.yourdomain.com/v1
     api_key="sk-portal-your-key-here"
 )
 
 response = client.chat.completions.create(
     model="deepseek-v4-flash",
-    messages=[{"role": "user", "content": "สวัสดี แนะนำตัวหน่อย"}],
+    messages=[{"role": "user", "content": "Hello, introduce yourself briefly."}],
     stream=True
 )
 
@@ -205,20 +218,20 @@ curl http://localhost:8080/v1/chat/completions \
   }'
 ```
 
-### การตั้งค่าใน Cursor IDE / Cline (VS Code)
-1. ไปที่ **Settings -> Models -> OpenAI API Key**
-2. ใส่การตั้งค่าดังนี้:
-   - **Base URL:** `http://localhost:8080/v1` (หรือโดเมนบน VPS)
-   - **API Key:** คีย์ของคุณจากหน้าแดชบอร์ด (`sk-portal-...`)
-   - **Model Name:** เลือกใส่โมเดล เช่น `deepseek-v4-flash` หรือ `GLM-5.3-Flash`
+### Cursor IDE / Cline (VS Code) Setup
+1. Go to **Settings -> Models -> [OI] API Key**.
+2. Enter the following settings:
+   - **Base URL:** `http://localhost:8080/v1` (or your VPS domain)
+   - **API Key:** your key from the dashboard (`sk-portal-...`)
+   - **Model Name:** pick a model such as `deepseek-v4-flash` or `GLM-5.3-Flash`
 
 ---
 
-## การนำขึ้นใช้งานจริงบน VPS (Production Deployment)
+## Production Deployment (VPS)
 
-### 1. รันเบื้องหลังด้วย Systemd Service
+### 1. Run in the Background with a Systemd Service
 
-สร้างไฟล์ `/etc/systemd/system/ai-gateway.service`:
+Create `/etc/systemd/system/ai-gateway.service`:
 
 ```ini
 [Unit]
@@ -241,7 +254,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now ai-gateway
 ```
 
-### 2. ตั้งค่า Nginx Reverse Proxy พร้อม SSL (HTTPS)
+### 2. Configure an Nginx Reverse Proxy with SSL (HTTPS)
 
 ```nginx
 server {
@@ -250,13 +263,13 @@ server {
     location / {
         proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
-        
-        # รองรับ Server-Sent Events (SSE) Streaming
+
+        # Support Server-Sent Events (SSE) streaming
         proxy_set_header Connection '';
         proxy_buffering off;
         proxy_cache off;
         proxy_read_timeout 300s;
-        
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -267,7 +280,7 @@ server {
 
 ---
 
-## ลิขสิทธิ์และการพัฒนา (Copyright)
+## Copyright
 
-© 2026 Ai Gateway. All rights reserved.  
+© 2026 Ai Gateway. All rights reserved.
 by ffxlm
