@@ -430,7 +430,18 @@
                     </button>
                 </div>
 
-                <p class="text-xs text-zinc-400">เลือกแพ็กเกจ VIP เพื่อปลดล็อกโควตา Token ไม่จำกัด และสิทธิ์ Priority Routing อัตโนมัติทันที</p>
+                <p class="text-xs text-zinc-400">{% if is_vip %}เลือกแพ็กเกจเพื่อต่ออายุการเป็นสมาชิก Unlimited VIP ของคุณ{% else %}เลือกแพ็กเกจ VIP เพื่อปลดล็อกโควตา Token ไม่จำกัด และสิทธิ์ Priority Routing อัตโนมัติทันที{% endif %}</p>
+
+                {% if is_vip %}
+                <!-- Renewal Info (existing VIP) -->
+                <div class="p-3 rounded-xl bg-violet-500/10 border border-violet-500/25 space-y-1">
+                    <div class="flex items-center space-x-1.5 text-[11px] font-semibold text-violet-300">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span>วันหมดอายุปัจจุบัน: {{ user.vip_expires_at[:16].replace('T', ' ') if user.vip_expires_at else '-' }}</span>
+                    </div>
+                    <p class="text-[11px] text-violet-300/70 leading-relaxed">แพ็กเกจที่เลือกจะถูก <span class="font-medium text-violet-200">บวกต่อจากวันหมดอายุเดิม</span> โดยอัตโนมัติ ไม่รีเซ็ตเวลาที่เหลือ</p>
+                </div>
+                {% endif %}
 
                 <!-- Stacked Passes (Daily / Weekly) -->
                 <div class="space-y-3">
@@ -523,6 +534,22 @@
                     </div>
                 </div>
 
+                <!-- Renewal Preview (only shown to existing VIP) -->
+                <div id="renewal-info-box" class="hidden p-3 rounded-xl bg-violet-950/40 border border-violet-800/60 space-y-1.5">
+                    <div class="flex items-center space-x-1.5 text-[11px] font-semibold text-violet-300">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span>โหมดต่ออายุ (สะสมเวลา)</span>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px]">
+                        <span class="text-violet-300/70">หมดอายุปัจจุบัน</span>
+                        <span id="renewal-current-exp" class="font-mono text-violet-200">-</span>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px]">
+                        <span class="text-violet-300/70">หลังต่ออายุ (+<span id="renewal-days">1</span> วัน)</span>
+                        <span id="renewal-new-exp" class="font-mono font-semibold text-violet-300">-</span>
+                    </div>
+                </div>
+
                 <!-- QR Code Box (When PromptPay ID is present) -->
                 <div id="qr-box-container" class="bg-white p-3.5 rounded-2xl mx-auto w-fit flex flex-col items-center shadow-lg">
                     <img id="promptpay-qr-img" src="" alt="PromptPay QR Code" class="w-[180px] h-[180px] block object-contain">
@@ -611,8 +638,8 @@
                     <i class="fa-solid fa-check"></i>
                 </div>
                 <div class="space-y-1">
-                    <h3 class="text-base font-bold text-zinc-100">อัปเกรด VIP สำเร็จเรียบร้อย!</h3>
-                    <p id="success-message-text" class="text-xs text-zinc-400">บัญชีของคุณได้รับการอัปเกรดเป็น Unlimited VIP เรียบร้อยแล้ว</p>
+                    <h3 id="success-title" class="text-base font-bold text-zinc-100">{% if is_vip %}ต่ออายุ VIP สำเร็จเรียบร้อย!{% else %}อัปเกรด VIP สำเร็จเรียบร้อย!{% endif %}</h3>
+                    <p id="success-message-text" class="text-xs text-zinc-400">บัญชีของคุณได้รับการอัปเดตเป็น Unlimited VIP เรียบร้อยแล้ว</p>
                 </div>
                 <button type="button" onclick="window.location.reload()" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs rounded-lg transition flex items-center justify-center space-x-2 shadow-sm">
                     <i class="fa-solid fa-rotate-right"></i>
@@ -628,6 +655,24 @@
         // Adaptive Countdown (VIP Expiry vs Midnight Free Reset)
         const isVipUser = {{ 'true' if is_vip else 'false' }};
         const vipExpiryIso = "{{ user.vip_expires_at if (is_vip and user.vip_expires_at) else '' }}";
+
+        // Format a Date as "DD/MM/YYYY HH:MM" in local time
+        function formatVipDate(dateObj) {
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${pad(dateObj.getDate())}/${pad(dateObj.getMonth() + 1)}/${dateObj.getFullYear()} ${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
+        }
+
+        // Base timestamp to extend from: later of now or the current expiry (matches backend stacking)
+        function vipRenewalBase() {
+            const now = new Date();
+            if (isVipUser && vipExpiryIso) {
+                const exp = new Date(vipExpiryIso.replace(' ', 'T'));
+                if (!isNaN(exp.getTime()) && exp.getTime() > now.getTime()) {
+                    return exp;
+                }
+            }
+            return now;
+        }
 
         function updateCountdownClock() {
             const now = new Date();
@@ -990,6 +1035,29 @@
                     if (nameEl) nameEl.textContent = data.promptpay_name;
                 }
 
+                // Renewal preview (only for existing VIP): show current expiry and the extended date
+                const renewalBox = document.getElementById('renewal-info-box');
+                if (renewalBox) {
+                    if (isVipUser) {
+                        const base = vipRenewalBase();
+                        const days = Number(data.days) || 0;
+                        const newExp = new Date(base.getTime() + days * 86400000);
+
+                        const curEl = document.getElementById('renewal-current-exp');
+                        if (curEl) curEl.textContent = vipExpiryIso ? formatVipDate(base) : 'ไม่มี (เริ่มใหม่)';
+
+                        const daysEl = document.getElementById('renewal-days');
+                        if (daysEl) daysEl.textContent = days;
+
+                        const newEl = document.getElementById('renewal-new-exp');
+                        if (newEl) newEl.textContent = formatVipDate(newExp);
+
+                        renewalBox.classList.remove('hidden');
+                    } else {
+                        renewalBox.classList.add('hidden');
+                    }
+                }
+
                 // Update QR code & PromptPay view
                 const qrImg = document.getElementById('promptpay-qr-img');
                 const qrBox = document.getElementById('qr-box-container');
@@ -1127,6 +1195,8 @@
                 // Show success view
                 document.getElementById('vip-view-checkout').classList.add('hidden');
                 document.getElementById('vip-view-success').classList.remove('hidden');
+                const succTitle = document.getElementById('success-title');
+                if (succTitle) succTitle.textContent = data.renewal ? 'ต่ออายุ VIP สำเร็จเรียบร้อย!' : 'อัปเกรด VIP สำเร็จเรียบร้อย!';
                 const succText = document.getElementById('success-message-text');
                 if (succText && data.message) succText.textContent = data.message;
 

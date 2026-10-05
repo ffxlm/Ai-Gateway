@@ -125,18 +125,26 @@ def check_user_quota(user: Dict[str, Any]) -> tuple[bool, str]:
     
     return True, f"Remaining: {daily_limit - used:,} tokens"
 
-def atomic_record_usage(user_id: str, tokens: int, model: str = "", latency_ms: float = 0.0, status_code: int = 200):
+def atomic_record_usage(user_id: str, tokens: int, model: str = "", latency_ms: float = 0.0, status_code: int = 200, is_vip: bool = False):
+    """Record a completed request.
+
+    Every request is logged to request_logs (used for analytics), but only Free-tier
+    usage is charged against the daily free quota. VIP usage is unlimited and must not
+    consume the free allowance, so a VIP who later drops back to Free keeps the free
+    quota for that day intact.
+    """
     today = get_today_str()
     with db_session() as conn:
         cursor = conn.cursor()
-        # Atomic token increment
-        cursor.execute("""
-        UPDATE users 
-        SET daily_token_usage = daily_token_usage + ?, last_usage_date = ?
-        WHERE id = ?
-        """, (tokens, today, user_id))
+        # Charge the daily free quota only for non-VIP requests
+        if not is_vip:
+            cursor.execute("""
+            UPDATE users 
+            SET daily_token_usage = daily_token_usage + ?, last_usage_date = ?
+            WHERE id = ?
+            """, (tokens, today, user_id))
         
-        # Log request
+        # Log every request (Free + VIP) for analytics
         cursor.execute("""
         INSERT INTO request_logs (user_id, model, tokens_used, latency_ms, status_code)
         VALUES (?, ?, ?, ?, ?)
@@ -213,11 +221,20 @@ def reset_user_quota(user_id: str):
 def get_all_users() -> List[Dict[str, Any]]:
     with db_session() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users ORDER BY created_at DESC")
+        # today_tokens comes from request_logs so it reflects real usage for every tier
+        # (users.daily_token_usage only tracks Free-tier quota consumption).
+        cursor.execute("""
+        SELECT u.*,
+               COALESCE((
+                   SELECT SUM(r.tokens_used) FROM request_logs r
+                   WHERE r.user_id = u.id AND DATE(r.created_at) = DATE('now', 'localtime')
+               ), 0) AS today_tokens
+        FROM users u
+        ORDER BY u.created_at DESC
+        """)
         return [dict(r) for r in cursor.fetchall()]
 
 def get_portal_stats() -> Dict[str, Any]:
-    today = get_today_str()
     with db_session() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) AS total_users FROM users")
@@ -226,105 +243,78 @@ def get_portal_stats() -> Dict[str, Any]:
         cursor.execute("SELECT COUNT(*) AS total_vip FROM users WHERE tier = 'vip' AND vip_expires_at > ?", (now_local().isoformat(),))
         total_vip = cursor.fetchone()["total_vip"]
         
-        cursor.execute("SELECT SUM(daily_token_usage) AS total_tokens_today FROM users WHERE last_usage_date = ?", (today,))
+        # Total tokens today is summed from request_logs so it includes VIP usage too
+        # (VIP usage is intentionally not charged to users.daily_token_usage).
+        cursor.execute("SELECT COALESCE(SUM(tokens_used), 0) AS total_tokens_today FROM request_logs WHERE DATE(created_at) = DATE('now', 'localtime')")
         total_tokens_today = cursor.fetchone()["total_tokens_today"] or 0
         
-        cursor.execute("SELECT COUNT(*) AS requests_today FROM request_logs WHERE DATE(created_at) = DATE('now')")
+        cursor.execute("SELECT COUNT(*) AS requests_today FROM request_logs WHERE DATE(created_at) = DATE('now', 'localtime')")
         requests_today = cursor.fetchone()["requests_today"]
-        
+
+        # Platform-wide cumulative totals (Free + VIP)
+        cursor.execute("SELECT COALESCE(SUM(tokens_used), 0) AS all_time FROM request_logs")
+        all_time_tokens = cursor.fetchone()["all_time"]
+
+        cursor.execute("SELECT COUNT(DISTINCT DATE(created_at)) AS active_days FROM request_logs")
+        active_days = cursor.fetchone()["active_days"] or 0
+        avg_per_day = int(all_time_tokens / active_days) if active_days > 0 else 0
+
         return {
             "total_users": total_users,
             "total_vip": total_vip,
             "total_tokens_today": total_tokens_today,
-            "requests_today": requests_today
+            "requests_today": requests_today,
+            "all_time_tokens": all_time_tokens,
+            "avg_per_day": avg_per_day
         }
 
-def get_user_analytics(user_id: str, time_range: str = "24h") -> Dict[str, Any]:
+def _aggregate_usage(time_range: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Aggregate request_logs into time buckets, optionally scoped to a single user.
+
+    Returns labels/tokens/requests for the requested range plus the all-time total.
+    """
     now = now_local()
+    user_clause = "AND user_id = ?" if user_id else ""
+    user_params = (user_id,) if user_id else ()
+
     with db_session() as conn:
         cursor = conn.cursor()
-        
-        # All-time total tokens for this user
-        cursor.execute("SELECT COALESCE(SUM(tokens_used), 0) AS total FROM request_logs WHERE user_id = ?", (user_id,))
+
+        if user_id:
+            cursor.execute("SELECT COALESCE(SUM(tokens_used), 0) AS total FROM request_logs WHERE user_id = ?", (user_id,))
+        else:
+            cursor.execute("SELECT COALESCE(SUM(tokens_used), 0) AS total FROM request_logs")
         all_time_tokens = cursor.fetchone()["total"]
 
         if time_range == "7d":
-            # Last 7 days
             start_time = (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
-            cursor.execute("""
-                SELECT strftime('%Y-%m-%d', created_at) AS bucket,
-                       COUNT(*) AS req_count,
-                       COALESCE(SUM(tokens_used), 0) AS token_sum
-                FROM request_logs
-                WHERE user_id = ? AND created_at >= ?
-                GROUP BY bucket
-            """, (user_id, start_time.strftime('%Y-%m-%d %H:%M:%S')))
-            rows = {r["bucket"]: r for r in cursor.fetchall()}
-
-            labels = []
-            token_data = []
-            req_data = []
-            cur = start_time
-            for _ in range(7):
-                b_key = cur.strftime("%Y-%m-%d")
-                label = cur.strftime("%a %d")
-                labels.append(label)
-                r = rows.get(b_key)
-                token_data.append(r["token_sum"] if r else 0)
-                req_data.append(r["req_count"] if r else 0)
-                cur += timedelta(days=1)
-
+            bucket_fmt, label_fmt, steps, step = "%Y-%m-%d", "%a %d", 7, timedelta(days=1)
         elif time_range == "30d":
-            # Last 30 days
             start_time = (now - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
-            cursor.execute("""
-                SELECT strftime('%Y-%m-%d', created_at) AS bucket,
-                       COUNT(*) AS req_count,
-                       COALESCE(SUM(tokens_used), 0) AS token_sum
-                FROM request_logs
-                WHERE user_id = ? AND created_at >= ?
-                GROUP BY bucket
-            """, (user_id, start_time.strftime('%Y-%m-%d %H:%M:%S')))
-            rows = {r["bucket"]: r for r in cursor.fetchall()}
-
-            labels = []
-            token_data = []
-            req_data = []
-            cur = start_time
-            for _ in range(30):
-                b_key = cur.strftime("%Y-%m-%d")
-                label = cur.strftime("%d/%m")
-                labels.append(label)
-                r = rows.get(b_key)
-                token_data.append(r["token_sum"] if r else 0)
-                req_data.append(r["req_count"] if r else 0)
-                cur += timedelta(days=1)
-
+            bucket_fmt, label_fmt, steps, step = "%Y-%m-%d", "%d/%m", 30, timedelta(days=1)
         else:  # "24h"
-            # Last 24 hours (hourly)
             start_time = (now - timedelta(hours=23)).replace(minute=0, second=0, microsecond=0)
-            cursor.execute("""
-                SELECT strftime('%Y-%m-%d %H:00', created_at) AS bucket,
-                       COUNT(*) AS req_count,
-                       COALESCE(SUM(tokens_used), 0) AS token_sum
-                FROM request_logs
-                WHERE user_id = ? AND created_at >= ?
-                GROUP BY bucket
-            """, (user_id, start_time.strftime('%Y-%m-%d %H:%M:%S')))
-            rows = {r["bucket"]: r for r in cursor.fetchall()}
+            bucket_fmt, label_fmt, steps, step = "%Y-%m-%d %H:00", "%H:00", 24, timedelta(hours=1)
 
-            labels = []
-            token_data = []
-            req_data = []
-            cur = start_time
-            for _ in range(24):
-                b_key = cur.strftime("%Y-%m-%d %H:00")
-                label = cur.strftime("%H:00")
-                labels.append(label)
-                r = rows.get(b_key)
-                token_data.append(r["token_sum"] if r else 0)
-                req_data.append(r["req_count"] if r else 0)
-                cur += timedelta(hours=1)
+        cursor.execute(f"""
+            SELECT strftime('{bucket_fmt}', created_at) AS bucket,
+                   COUNT(*) AS req_count,
+                   COALESCE(SUM(tokens_used), 0) AS token_sum
+            FROM request_logs
+            WHERE created_at >= ? {user_clause}
+            GROUP BY bucket
+        """, (start_time.strftime('%Y-%m-%d %H:%M:%S'),) + user_params)
+        rows = {r["bucket"]: r for r in cursor.fetchall()}
+
+        labels, token_data, req_data = [], [], []
+        cur = start_time
+        for _ in range(steps):
+            b_key = cur.strftime(bucket_fmt)
+            labels.append(cur.strftime(label_fmt))
+            r = rows.get(b_key)
+            token_data.append(r["token_sum"] if r else 0)
+            req_data.append(r["req_count"] if r else 0)
+            cur += step
 
         return {
             "all_time_tokens": all_time_tokens,
@@ -334,4 +324,19 @@ def get_user_analytics(user_id: str, time_range: str = "24h") -> Dict[str, Any]:
             "tokens": token_data,
             "requests": req_data
         }
+
+def get_user_analytics(user_id: str, time_range: str = "24h") -> Dict[str, Any]:
+    return _aggregate_usage(time_range, user_id)
+
+def get_portal_analytics(time_range: str = "24h") -> Dict[str, Any]:
+    """Platform-wide usage analytics across all users, plus the average per active day."""
+    data = _aggregate_usage(time_range)
+    with db_session() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(DISTINCT DATE(created_at)) AS active_days FROM request_logs")
+        active_days = cursor.fetchone()["active_days"] or 0
+    data["active_days"] = active_days
+    data["avg_per_day"] = int(data["all_time_tokens"] / active_days) if active_days > 0 else 0
+    return data
+
 

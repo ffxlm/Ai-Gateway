@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard | AI Gateway</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         body { 
@@ -38,8 +39,8 @@
 
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
-        <!-- Stats Overview (2x2 on Mobile, 4 Cols on Desktop) -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <!-- Stats Overview (2 cols on Mobile, 3 on Desktop) -->
+        <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-indigo-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
                 <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
                     <span class="truncate font-medium">Total Users</span>
@@ -78,6 +79,72 @@
                     </div>
                 </div>
                 <div class="text-lg sm:text-2xl font-bold font-mono text-emerald-400">{{ "{:,}".format(stats.requests_today) }}</div>
+            </div>
+
+            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-violet-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
+                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
+                    <span class="truncate font-medium">All-Time Tokens</span>
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
+                        <i class="fa-solid fa-database text-xs sm:text-sm"></i>
+                    </div>
+                </div>
+                <div class="text-base sm:text-2xl font-bold font-mono text-violet-300 truncate">{{ "{:,}".format(stats.all_time_tokens) }}</div>
+            </div>
+
+            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-amber-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
+                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
+                    <span class="truncate font-medium">Avg / Active Day</span>
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
+                        <i class="fa-solid fa-calculator text-xs sm:text-sm"></i>
+                    </div>
+                </div>
+                <div class="text-base sm:text-2xl font-bold font-mono text-amber-300 truncate">{{ "{:,}".format(stats.avg_per_day) }}</div>
+            </div>
+        </div>
+
+        <!-- Section: Platform Usage Analytics -->
+        <div class="p-4 sm:p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4 sm:space-y-5">
+            <div class="flex items-center justify-between gap-3 border-b border-zinc-800/80 pb-3 sm:pb-4">
+                <div>
+                    <h2 class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
+                        <i class="fa-solid fa-chart-simple text-cyan-400"></i>
+                        <span>Platform Usage</span>
+                    </h2>
+                    <p class="text-[11px] sm:text-xs text-zinc-400 mt-0.5">Total token consumption across all users over time.</p>
+                </div>
+                <div class="inline-flex items-center bg-zinc-950 p-0.5 sm:p-1 rounded-lg border border-zinc-800 text-xs font-medium shadow-inner shrink-0">
+                    <button id="admin-range-btn-24h" onclick="loadPlatformAnalytics('24h')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 transition font-mono text-[11px] sm:text-xs">24h</button>
+                    <button id="admin-range-btn-7d" onclick="loadPlatformAnalytics('7d')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-white bg-zinc-800 transition shadow-xs font-mono text-[11px] sm:text-xs">7d</button>
+                    <button id="admin-range-btn-30d" onclick="loadPlatformAnalytics('30d')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 transition font-mono text-[11px] sm:text-xs">30d</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-3 divide-x divide-zinc-800/80 bg-zinc-950/70 rounded-lg border border-zinc-800/80 py-2 sm:py-3 px-1 sm:px-2 shadow-inner">
+                <div class="px-2 sm:px-3 text-center sm:text-left space-y-0.5">
+                    <div class="text-[10px] sm:text-[11px] font-medium text-zinc-400 uppercase tracking-wider truncate">All-Time</div>
+                    <div class="text-xs sm:text-lg font-bold font-mono text-zinc-100 truncate">
+                        <span id="admin-stat-all-time">{{ "{:,}".format(analytics.all_time_tokens) }}</span>
+                        <span class="text-[10px] text-zinc-500 font-normal font-sans hidden sm:inline">tokens</span>
+                    </div>
+                </div>
+                <div class="px-2 sm:px-3 text-center sm:text-left space-y-0.5">
+                    <div id="admin-stat-period-label" class="text-[10px] sm:text-[11px] font-medium text-cyan-400 uppercase tracking-wider truncate">Last 7 Days</div>
+                    <div class="text-xs sm:text-lg font-bold font-mono text-cyan-400 truncate">
+                        <span id="admin-stat-period-tokens">{{ "{:,}".format(analytics.period_tokens) }}</span>
+                        <span class="text-[10px] text-cyan-500/70 font-normal font-sans hidden sm:inline">tokens</span>
+                    </div>
+                </div>
+                <div class="px-2 sm:px-3 text-center sm:text-left space-y-0.5">
+                    <div class="text-[10px] sm:text-[11px] font-medium text-violet-400 uppercase tracking-wider truncate">Requests</div>
+                    <div class="text-xs sm:text-lg font-bold font-mono text-violet-400 truncate">
+                        <span id="admin-stat-period-requests">{{ "{:,}".format(analytics.period_requests) }}</span>
+                        <span class="text-[10px] text-violet-500/70 font-normal font-sans hidden sm:inline">calls</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="relative w-full h-44 sm:h-60 bg-zinc-950/40 rounded-lg p-2 sm:p-4 border border-zinc-800/70">
+                <canvas id="platformChart"></canvas>
             </div>
         </div>
 
@@ -195,7 +262,7 @@
                                 {% endif %}
                             </td>
                             <td class="py-3 px-3 font-mono text-zinc-300">
-                                {{ "{:,}".format(u.daily_token_usage) }}
+                                {{ "{:,}".format(u.today_tokens) }}
                             </td>
                             <td class="py-3 px-3 font-mono text-zinc-400">
                                 {{ u.vip_expires_at[:16].replace('T', ' ') if u.vip_expires_at else '-' }}
@@ -333,6 +400,136 @@
             });
             if (res.ok) window.location.reload();
         }
+
+        // ─── Platform Usage Analytics (Chart.js) ───
+        let platformChartInstance = null;
+        let platformAnalyticsData = {{ analytics | tojson }};
+
+        function renderPlatformChart(data) {
+            const canvas = document.getElementById('platformChart');
+            if (!canvas) return;
+
+            if (platformChartInstance) {
+                platformChartInstance.destroy();
+            }
+
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+            gradient.addColorStop(0, 'rgba(34, 211, 238, 0.9)'); // cyan-400
+            gradient.addColorStop(1, 'rgba(8, 145, 178, 0.65)'); // cyan-600
+
+            platformChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Tokens Used',
+                        data: data.tokens,
+                        backgroundColor: gradient,
+                        hoverBackgroundColor: '#38bdf8',
+                        borderRadius: 4,
+                        borderSkipped: false,
+                        maxBarThickness: data.labels.length > 20 ? 10 : 26
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#18181b',
+                            titleColor: '#f4f4f5',
+                            bodyColor: '#a1a1aa',
+                            borderColor: '#27272a',
+                            borderWidth: 1,
+                            padding: 8,
+                            cornerRadius: 6,
+                            displayColors: false,
+                            titleFont: { family: 'ui-monospace, monospace', size: 11, weight: 'bold' },
+                            bodyFont: { family: 'ui-monospace, monospace', size: 11 },
+                            callbacks: {
+                                label: function(context) {
+                                    const idx = context.dataIndex;
+                                    const tokens = (data.tokens && data.tokens[idx] !== undefined) ? data.tokens[idx] : 0;
+                                    const reqs = (data.requests && data.requests[idx] !== undefined) ? data.requests[idx] : 0;
+                                    return [
+                                        `Tokens: ${tokens.toLocaleString()}`,
+                                        `Requests: ${reqs.toLocaleString()}`
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                color: '#71717a',
+                                maxRotation: 0,
+                                autoSkip: true,
+                                maxTicksLimit: 7,
+                                font: { family: 'ui-monospace, monospace', size: 10 }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(39, 39, 42, 0.4)', drawBorder: false },
+                            ticks: {
+                                color: '#71717a',
+                                maxTicksLimit: 5,
+                                font: { family: 'ui-monospace, monospace', size: 10 },
+                                callback: function(val) {
+                                    if (val === 0) return '0';
+                                    if (val >= 1000000) return (val / 1000000).toFixed(val % 1000000 === 0 ? 0 : 1) + 'M';
+                                    if (val >= 1000) return (val / 1000).toFixed(val % 1000 === 0 ? 0 : 1) + 'k';
+                                    return val.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadPlatformAnalytics(range) {
+            ['24h', '7d', '30d'].forEach(r => {
+                const btn = document.getElementById(`admin-range-btn-${r}`);
+                if (btn) {
+                    if (r === range) {
+                        btn.className = 'px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-white bg-zinc-800 transition shadow-xs font-mono text-[11px] sm:text-xs';
+                    } else {
+                        btn.className = 'px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 transition font-mono text-[11px] sm:text-xs';
+                    }
+                }
+            });
+
+            const labelMap = { '24h': 'Last 24h', '7d': 'Last 7 Days', '30d': 'Last 30 Days' };
+            const periodLabel = document.getElementById('admin-stat-period-label');
+            if (periodLabel) periodLabel.textContent = labelMap[range] || 'In Period';
+
+            try {
+                const res = await fetch(`/api/admin/analytics?range=${range}`);
+                const json = await res.json();
+                if (json.status === 'ok') {
+                    platformAnalyticsData = json.data;
+                    const allTimeEl = document.getElementById('admin-stat-all-time');
+                    const periodEl = document.getElementById('admin-stat-period-tokens');
+                    const reqEl = document.getElementById('admin-stat-period-requests');
+                    if (allTimeEl) allTimeEl.textContent = Number(platformAnalyticsData.all_time_tokens).toLocaleString();
+                    if (periodEl) periodEl.textContent = Number(platformAnalyticsData.period_tokens).toLocaleString();
+                    if (reqEl) reqEl.textContent = Number(platformAnalyticsData.period_requests).toLocaleString();
+                    renderPlatformChart(platformAnalyticsData);
+                }
+            } catch (err) {
+                console.error('Error fetching platform analytics:', err);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderPlatformChart(platformAnalyticsData);
+        });
     </script>
 </body>
 </html>

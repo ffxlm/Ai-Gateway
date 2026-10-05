@@ -69,7 +69,7 @@ async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, header
                 content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
                 tokens = max(len(content) // 4 + 50, 100)
             
-            atomic_record_usage(user["id"], tokens, model=model, latency_ms=latency, status_code=200)
+            atomic_record_usage(user["id"], tokens, model=model, latency_ms=latency, status_code=200, is_vip=is_vip_active(user))
             return resp.status_code, "application/json", clean_bytes
         else:
             return resp.status_code, "application/json", resp.content
@@ -111,7 +111,7 @@ async def handle_streaming_proxy(client: httpx.AsyncClient, url: str, headers: d
                 total_tokens = max(collected_chunks * 3, 50)
             
             latency = (time.time() - start_time) * 1000
-            atomic_record_usage(user["id"], total_tokens, model=model, latency_ms=latency, status_code=200)
+            atomic_record_usage(user["id"], total_tokens, model=model, latency_ms=latency, status_code=200, is_vip=is_vip_active(user))
         finally:
             await resp.aclose()
             await client.aclose()

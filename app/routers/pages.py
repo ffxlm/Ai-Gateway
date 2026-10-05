@@ -2,12 +2,13 @@ from fastapi import APIRouter, Request, HTTPException, Depends, Form, File, Uplo
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import os
+from datetime import datetime
 from app.core.config import settings
 from app.core.database import db_session, get_setting, update_setting
 from app.services.user_service import (
     get_or_create_user, regenerate_user_key, add_vip_days, revoke_vip, delete_user,
     toggle_user_ban, reset_user_quota, get_all_users, get_portal_stats, is_vip_active,
-    get_user_analytics, apply_daily_rollover
+    get_user_analytics, get_portal_analytics, apply_daily_rollover
 )
 from app.services.payment_service import (
     generate_promptpay_payload, generate_qr_data_url, verify_slip_with_slipok, is_trans_ref_used,
@@ -144,13 +145,15 @@ async def admin_page(request: Request):
         "slipok_api_key": get_setting("slipok_api_key", settings.SLIPOK_API_KEY)
     }
     recent_payments = get_recent_payments(20)
+    portal_analytics = get_portal_analytics("7d")
     
     return templates.TemplateResponse(request, "admin.html", {
         "user": user,
         "stats": stats,
         "users": all_users,
         "settings": current_settings,
-        "payments": recent_payments
+        "payments": recent_payments,
+        "analytics": portal_analytics
     })
 
 @pages_router.post("/api/user/regenerate-key")
@@ -167,6 +170,14 @@ async def user_analytics_api(request: Request, range: str = "24h"):
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
     data = get_user_analytics(user["id"], range)
+    return JSONResponse({"status": "ok", "data": data})
+
+@pages_router.get("/api/admin/analytics")
+async def admin_analytics_api(request: Request, range: str = "24h"):
+    user = get_session_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    data = get_portal_analytics(range)
     return JSONResponse({"status": "ok", "data": data})
 
 @pages_router.post("/api/admin/upgrade-vip")
@@ -307,10 +318,23 @@ async def verify_slip_api(
             "message": "เกิดข้อผิดพลาดในการบันทึกข้อมูล หรือสลิปถูกใช้งานไปแล้ว"
         }, status_code=400)
 
+    was_vip = is_vip_active(user)
     new_exp = add_vip_days(user["id"], days)
+
+    try:
+        new_exp_display = datetime.fromisoformat(new_exp).strftime("%d/%m/%Y %H:%M")
+    except Exception:
+        new_exp_display = new_exp
+
+    if was_vip:
+        message = f"ต่ออายุ VIP สำเร็จ! เพิ่มเวลา +{days} วัน (วันหมดอายุใหม่: {new_exp_display})"
+    else:
+        message = f"อัปเกรด VIP สำเร็จ! บัญชีของคุณเป็น Unlimited VIP แล้ว (+{days} วัน)"
+
     return JSONResponse({
         "status": "ok",
-        "message": f"ชำระเงินสำเร็จ! บัญชีของคุณได้รับการอัปเกรดเป็น VIP เรียบร้อยแล้ว (+{days} วัน)",
+        "message": message,
+        "renewal": was_vip,
         "days_added": days,
         "vip_expires_at": new_exp
     })
