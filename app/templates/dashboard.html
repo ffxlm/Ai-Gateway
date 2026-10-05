@@ -327,9 +327,12 @@
         <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-5">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
                 <div>
-                    <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center flex-wrap gap-x-2 gap-y-1.5">
                         <i class="fa-solid fa-layer-group text-zinc-400"></i>
                         <span>Free Models ({{ models|length }})</span>
+                        <span class="normal-case tracking-normal inline-flex items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
+                            <i class="fa-solid fa-infinity text-[9px]"></i>Unlimited
+                        </span>
                     </h2>
                     <p class="text-xs text-zinc-400 mt-1">Unlimited usage at no cost via <code class="text-zinc-300 font-mono text-[11px] bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800">/v1/chat/completions</code>. Click any model ID to copy.</p>
                 </div>
