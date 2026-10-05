@@ -507,7 +507,7 @@
                     {% for p in topup_packages %}
                     <button type="button" onclick="selectPackage({{ p.thb }})" data-thb="{{ p.thb }}" class="topup-chip p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 transition text-center">
                         <div class="text-sm font-bold font-mono text-zinc-100">฿{{ p.thb }}</div>
-                        <div class="text-[10px] font-mono text-emerald-400">${{ "%.2f"|format(p.usd) }}</div>
+                        <div class="text-[10px] font-mono text-emerald-400">${{ p.usd | usd }}</div>
                     </button>
                     {% endfor %}
                 </div>
@@ -896,10 +896,19 @@
             updateUsdPreview();
         }
 
+        // Mirror the server's USD formatting: 2 decimals normally, more when tiny.
+        function fmtUsd(v) {
+            const a = Math.abs(v);
+            if (a === 0) return '0.00';
+            if (a >= 1) return v.toFixed(2);
+            if (a >= 0.01) return v.toFixed(4);
+            return v.toFixed(6);
+        }
+
         function updateUsdPreview() {
             const thb = parseFloat(document.getElementById('topup-amount-input').value) || 0;
             const usd = USD_TO_THB > 0 ? (thb / USD_TO_THB) : 0;
-            document.getElementById('usd-preview').textContent = '$' + usd.toFixed(2);
+            document.getElementById('usd-preview').textContent = '$' + fmtUsd(usd);
             const warning = document.getElementById('topup-min-warning');
             const btn = document.getElementById('btn-continue-topup');
             const belowMin = thb > 0 && thb < MIN_TOPUP_THB;
@@ -928,7 +937,7 @@
                 const amtThb = Number(data.amount_thb).toFixed(2);
                 document.getElementById('checkout-amount-display').textContent = amtThb;
                 document.getElementById('checkout-amount-warning').textContent = amtThb;
-                document.getElementById('checkout-usd-display').textContent = Number(data.amount_usd).toFixed(2);
+                document.getElementById('checkout-usd-display').textContent = fmtUsd(Number(data.amount_usd));
                 if (data.promptpay_name) {
                     document.getElementById('checkout-promptpay-name').textContent = data.promptpay_name;
                 }

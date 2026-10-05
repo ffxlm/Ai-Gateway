@@ -52,6 +52,17 @@ templates.env.filters["usd"] = _fmt_usd
 templates.env.filters["thb"] = _fmt_thb
 
 
+def _usd_from_thb(amount_thb: float, rate: float) -> float:
+    """Convert THB to USD keeping enough precision that the THB round-trips.
+
+    Rounding to 2 decimals would over-credit (฿10 ÷ 35 = $0.2857 → $0.29 → ฿10.15),
+    so keep 4 decimals; the THB display then rounds back to the paid amount.
+    """
+    if rate <= 0:
+        return 0.0
+    return round(float(amount_thb) / rate, 4)
+
+
 def get_session_user(request: Request):
     user_id = request.cookies.get("portal_session")
     if not user_id:
@@ -94,7 +105,7 @@ def _topup_packages(rate: float) -> list:
             continue
         if thb <= 0:
             continue
-        packages.append({"thb": thb, "usd": round(thb / rate, 2) if rate > 0 else 0})
+        packages.append({"thb": thb, "usd": _usd_from_thb(thb, rate)})
     return packages
 
 
@@ -303,7 +314,7 @@ async def get_promptpay_info(request: Request, amount: float = 0):
     if amount < min_thb:
         return JSONResponse({"status": "error", "message": f"ยอดเติมขั้นต่ำ ฿{min_thb:,.0f}"}, status_code=400)
 
-    amount_usd = round(amount / rate, 2) if rate > 0 else 0
+    amount_usd = _usd_from_thb(amount, rate)
     promptpay_id = get_setting("promptpay_id", settings.PROMPTPAY_ID).strip()
     promptpay_name = get_setting("promptpay_name", settings.PROMPTPAY_NAME)
     qr_payload = generate_promptpay_payload(promptpay_id, amount) if promptpay_id else ""
@@ -365,7 +376,7 @@ async def verify_slip_api(
             "message": "เกิดข้อผิดพลาดในการบันทึกข้อมูล หรือสลิปถูกใช้งานไปแล้ว",
         }, status_code=400)
 
-    usd_credited = round(amount / rate, 2) if rate > 0 else 0
+    usd_credited = _usd_from_thb(amount, rate)
     new_balance = add_balance(
         user["id"], usd_credited, "topup",
         f"Top-up ฿{amount:,.2f}", trans_ref,
@@ -373,7 +384,7 @@ async def verify_slip_api(
 
     return JSONResponse({
         "status": "ok",
-        "message": f"เติมเงินสำเร็จ! ได้รับ ${usd_credited:,.2f} เข้ากระเป๋าของคุณ",
+        "message": f"เติมเงินสำเร็จ! ได้รับ ${_fmt_usd(usd_credited)} เข้ากระเป๋าของคุณ",
         "usd_credited": usd_credited,
         "amount_thb": amount,
         "balance": new_balance,
