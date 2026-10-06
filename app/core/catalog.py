@@ -37,6 +37,20 @@ PREMIUM_MODELS = [
         "discount": 90,           # % cheaper than official
         "max_output_tokens": 32768,
     },
+    {
+        "id": "claude-opus-4-6",
+        "name": "the model 4.6",
+        "provider": "Anthropic",
+        "tag": "Frontier Agentic",
+        "price_in_usd": 0.50,     # our price, per 1M input tokens
+        "price_out_usd": 2.50,    # our price, per 1M output tokens
+        "official_in_usd": 5.00,  # official list price, struck through on the card
+        "official_out_usd": 25.00,
+        "discount": 90,           # % cheaper than official
+        # max_output_tokens omitted on purpose: falls back to the global
+        # PREMIUM_MAX_OUTPUT_TOKENS setting so Admin keeps control.
+        "trial_tokens_per_day": 100000,  # 100k free tokens/day for this model
+    },
 ]
 
 _PREMIUM_BY_ID = {m["id"]: m for m in PREMIUM_MODELS}
@@ -92,6 +106,8 @@ def _owner(model_id: str) -> str:
         return "zhipu"
     if "minimax" in low:
         return "minimax"
+    if "claude" in low:
+        return "anthropic"
     return "gateway"
 
 

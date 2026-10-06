@@ -80,6 +80,7 @@ The system serves 3 free models plus 1 premium model through 9Router. The catalo
 | Model ID | Provider | Input | Output | Official | Savings |
 |---|---|---|---|---|---|
 | `deepseek-v4.1-flash` | DeepSeek | $0.015 | $0.06 | $0.15 / $0.60 | 90% cheaper |
+| `claude-opus-4-6` | Anthropic | $0.50 | $2.50 | $5.00 / $25.00 | 90% cheaper |
 
 ---
 
