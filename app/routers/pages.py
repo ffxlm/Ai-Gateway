@@ -230,6 +230,8 @@ async def admin_page(request: Request):
     current_settings = {
         "master_router_url": get_setting("master_router_url", settings.MASTER_ROUTER_URL),
         "master_router_key": get_setting("master_router_key", settings.MASTER_ROUTER_KEY),
+        "premium_upstream_url": get_setting("premium_upstream_url", settings.PREMIUM_UPSTREAM_URL),
+        "premium_upstream_key": get_setting("premium_upstream_key", settings.PREMIUM_UPSTREAM_KEY),
         "discord_invite_url": get_setting("discord_invite_url", settings.DISCORD_INVITE_URL),
         "promptpay_id": get_setting("promptpay_id", settings.PROMPTPAY_ID),
         "promptpay_name": get_setting("promptpay_name", settings.PROMPTPAY_NAME),
@@ -239,6 +241,9 @@ async def admin_page(request: Request):
         "min_topup_thb": get_setting("min_topup_thb", str(settings.MIN_TOPUP_THB)),
         "topup_packages_thb": get_setting("topup_packages_thb", settings.TOPUP_PACKAGES_THB),
         "premium_trial_tokens_per_day": get_setting("premium_trial_tokens_per_day", str(settings.PREMIUM_TRIAL_TOKENS_PER_DAY)),
+        "free_concurrency_limit": get_setting("free_concurrency_limit", str(settings.FREE_CONCURRENCY_LIMIT)),
+        "premium_concurrency_limit": get_setting("premium_concurrency_limit", str(settings.PREMIUM_CONCURRENCY_LIMIT)),
+        "per_user_concurrency_limit": get_setting("per_user_concurrency_limit", str(settings.PER_USER_CONCURRENCY_LIMIT)),
     }
     recent_payments = get_recent_payments(20)
     wallet_tx = get_all_wallet_transactions(30)

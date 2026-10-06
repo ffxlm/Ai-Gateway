@@ -150,6 +150,8 @@ def init_db():
         default_settings = {
             "master_router_url": settings.MASTER_ROUTER_URL,
             "master_router_key": settings.MASTER_ROUTER_KEY,
+            "premium_upstream_url": settings.PREMIUM_UPSTREAM_URL,
+            "premium_upstream_key": settings.PREMIUM_UPSTREAM_KEY,
             "discord_invite_url": settings.DISCORD_INVITE_URL,
             "promptpay_id": settings.PROMPTPAY_ID,
             "promptpay_name": settings.PROMPTPAY_NAME,
@@ -159,6 +161,9 @@ def init_db():
             "min_topup_thb": str(settings.MIN_TOPUP_THB),
             "topup_packages_thb": settings.TOPUP_PACKAGES_THB,
             "premium_trial_tokens_per_day": str(settings.PREMIUM_TRIAL_TOKENS_PER_DAY),
+            "free_concurrency_limit": str(settings.FREE_CONCURRENCY_LIMIT),
+            "premium_concurrency_limit": str(settings.PREMIUM_CONCURRENCY_LIMIT),
+            "per_user_concurrency_limit": str(settings.PER_USER_CONCURRENCY_LIMIT),
         }
         for k, v in default_settings.items():
             cursor.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?);", (k, v))

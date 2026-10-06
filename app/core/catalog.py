@@ -27,6 +27,10 @@ FREE_MODELS = [
 PREMIUM_MODELS = [
     {
         "id": "deepseek-v4.1-flash",
+        # ``upstream_model`` is the name the premium provider expects. It is only
+        # ever used when building the outbound request; clients and the public
+        # model list keep seeing ``id`` above, so the origin stays hidden.
+        "upstream_model": "cb/deepseek-v4.1-flash",
         "name": "deepseek-v4.1-flash",
         "provider": "DeepSeek",
         "tag": "Flagship Reasoning",
@@ -38,18 +42,34 @@ PREMIUM_MODELS = [
         "max_output_tokens": 32768,
     },
     {
-        "id": "claude-opus-4-6",
-        "name": "claude-opus-4-6",
-        "provider": "Anthropic",
+        "id": "gpt-6-sol",
+        "name": "gpt-6-sol",
+        "provider": "[OI]",
+        "upstream_model": "cb/gpt-6-sol",
         "tag": "Frontier Agentic",
-        "price_in_usd": 0.50,     # our price, per 1M input tokens
-        "price_out_usd": 2.50,    # our price, per 1M output tokens
-        "official_in_usd": 5.00,  # official list price, struck through on the card
-        "official_out_usd": 25.00,
+        "price_in_usd": 0.20,     # our price, per 1M input tokens
+        "price_out_usd": 1.00,    # our price, per 1M output tokens
+        "official_in_usd": 2.00,  # official list price, struck through on the card
+        "official_out_usd": 10.00,
         "discount": 90,           # % cheaper than official
         # max_output_tokens omitted on purpose: falls back to the global
         # PREMIUM_MAX_OUTPUT_TOKENS setting so Admin keeps control.
-        "trial_tokens_per_day": 100000,  # 100k free tokens/day for this model
+        "trial_tokens_per_day": 200000,  # 200k free tokens/day for this model
+    },
+    {
+        "id": "gpt-6-astra",
+        "name": "gpt-6-astra",
+        "provider": "[OI]",
+        "upstream_model": "cb/gpt-6-astra",
+        "tag": "Frontier Reasoning",
+        "price_in_usd": 1.00,     # our price, per 1M input tokens
+        "price_out_usd": 5.00,    # our price, per 1M output tokens
+        "official_in_usd": 10.00, # official list price, struck through on the card
+        "official_out_usd": 50.00,
+        "discount": 90,           # % cheaper than official
+        # max_output_tokens omitted on purpose: falls back to the global
+        # PREMIUM_MAX_OUTPUT_TOKENS setting so Admin keeps control.
+        "trial_tokens_per_day": 50000,  # 50k free tokens/day for this model
     },
 ]
 
@@ -62,6 +82,14 @@ def is_premium_model(model_id: str) -> bool:
 
 def get_premium_model(model_id: str):
     return _PREMIUM_BY_ID.get(model_id)
+
+
+def upstream_model_id(model_id: str) -> str:
+    """Provider-side model name for a public id (falls back to the public id)."""
+    m = _PREMIUM_BY_ID.get(model_id)
+    if m and m.get("upstream_model"):
+        return m["upstream_model"]
+    return model_id
 
 
 def premium_trial_tokens(model_id: str):
@@ -106,6 +134,8 @@ def _owner(model_id: str) -> str:
         return "zhipu"
     if "minimax" in low:
         return "minimax"
+    if "gpt" in low:
+        return "openai"
     if "claude" in low:
         return "anthropic"
     return "gateway"

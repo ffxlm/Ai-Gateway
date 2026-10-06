@@ -183,6 +183,25 @@
                     <input type="number" step="1000" name="premium_trial_tokens_per_day" value="{{ settings.premium_trial_tokens_per_day }}" placeholder="1000000" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
                 </div>
 
+                <div class="space-y-1 md:col-span-2 pt-1">
+                    <p class="text-[10px] uppercase tracking-wider text-zinc-500">Concurrency — max requests in flight at once</p>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">Free Pool (9Router)</label>
+                    <input type="number" step="1" min="1" name="free_concurrency_limit" value="{{ settings.free_concurrency_limit }}" placeholder="40" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">Premium Pool (billed provider)</label>
+                    <input type="number" step="1" min="1" name="premium_concurrency_limit" value="{{ settings.premium_concurrency_limit }}" placeholder="30" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">Per-User Cap (across both pools)</label>
+                    <input type="number" step="1" min="1" name="per_user_concurrency_limit" value="{{ settings.per_user_concurrency_limit }}" placeholder="5" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
                 <div class="space-y-1">
                     <label class="text-xs font-medium text-zinc-400">Master 9Router Upstream URL</label>
                     <input type="text" name="master_router_url" value="{{ settings.master_router_url }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
@@ -191,6 +210,20 @@
                 <div class="space-y-1">
                     <label class="text-xs font-medium text-zinc-400">Master 9Router API Key</label>
                     <input type="password" name="master_router_key" value="{{ settings.master_router_key }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1 md:col-span-2 pt-1">
+                    <p class="text-[10px] uppercase tracking-wider text-zinc-500">Premium (xHigh) Upstream — used for billed models</p>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">Premium Upstream URL</label>
+                    <input type="text" name="premium_upstream_url" value="{{ settings.premium_upstream_url }}" placeholder="https://api.example.com/v1" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-zinc-400">Premium Upstream API Key</label>
+                    <input type="password" name="premium_upstream_key" value="{{ settings.premium_upstream_key }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
                 </div>
 
                 <div class="space-y-1 md:col-span-2">

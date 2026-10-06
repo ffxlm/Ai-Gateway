@@ -1,15 +1,85 @@
 import json
 import time
-import asyncio
+import codecs
 import httpx
 from typing import AsyncGenerator, Dict, Any, Tuple
 from app.core.config import settings
 from app.core.database import get_setting
-from app.core.catalog import api_models, premium_max_output_tokens
+from app.core.catalog import api_models, premium_max_output_tokens, upstream_model_id, is_premium_model
 from app.services.user_service import record_usage, release_reservation
+from app.services.concurrency import acquire_slot, release_slot
 
-# Concurrency control: one shared queue for every request.
-REQUEST_SEMAPHORE = asyncio.Semaphore(settings.CONCURRENCY_LIMIT)
+
+def _build_chat_url(base: str) -> str:
+    """Normalise a provider base URL into its chat-completions endpoint.
+
+    Accepts bases with or without a trailing ``/v1`` so both the 9Router bridge
+    (``https://api.thirx.com``) and the premium provider
+    (``https://api.inferhub.dev/v1``) can be stored exactly as issued.
+    """
+    base = (base or "").strip().rstrip("/")
+    if base.endswith("/v1"):
+        base = base[:-3]
+    return base + "/v1/chat/completions"
+
+
+def resolve_upstream(model: str) -> Tuple[str, str, str]:
+    """Map a public model id to (chat_url, api_key, upstream_model).
+
+    Free models keep flowing through the shared 9Router bridge. Premium models
+    are routed to their own provider using the private ``upstream_model`` name
+    from the catalog, so the provider's real naming never leaves this function.
+    """
+    if is_premium_model(model):
+        base = get_setting("premium_upstream_url", settings.PREMIUM_UPSTREAM_URL)
+        key = get_setting("premium_upstream_key", settings.PREMIUM_UPSTREAM_KEY)
+    else:
+        base = get_setting("master_router_url", settings.MASTER_ROUTER_URL)
+        key = get_setting("master_router_key", settings.MASTER_ROUTER_KEY)
+    return _build_chat_url(base), key, upstream_model_id(model)
+
+
+def _sanitize_error(status: int, raw: bytes) -> Tuple[int, str, bytes]:
+    """Convert an upstream error into a neutral portal error envelope.
+
+    The raw body is logged server-side only: provider identity, host names and
+    upstream request ids must never reach the client. The returned status code
+    is also remapped so an upstream auth failure cannot be mistaken for the
+    client's own credentials being wrong.
+    """
+    try:
+        text = raw.decode("utf-8", errors="replace")
+    except Exception:
+        text = str(raw)
+    print(f"[upstream-error] status={status} body={text[:2000]}")
+
+    if status == 429:
+        code, message = 429, "Upstream rate limit reached. Please retry shortly."
+    elif status in (400, 404, 413, 422):
+        code, message = 400, "The upstream provider rejected this request."
+    else:
+        # 401/403/5xx and anything unexpected are our problem, not the client's.
+        code, message = 502, "Upstream provider is unavailable. Please try again."
+    body = json.dumps({"error": {"message": message, "type": "upstream_error", "code": code}}).encode("utf-8")
+    return code, "application/json", body
+
+
+def _rewrite_sse_line(line: str, public_model: str) -> str:
+    """Swap the upstream model name for our public id on a single SSE line."""
+    if not line.startswith("data:"):
+        return line
+    payload = line[5:].strip()
+    if not payload or payload == "[DONE]":
+        return line
+    try:
+        obj = json.loads(payload)
+    except Exception:
+        return line
+    if not isinstance(obj, dict) or obj.get("model") == public_model:
+        return line
+    obj["model"] = public_model
+    cr = "\r" if line.endswith("\r") else ""
+    return "data: " + json.dumps(obj, separators=(",", ":"), ensure_ascii=False) + cr
 
 
 def _count_text_tokens(text: Any) -> int:
@@ -75,31 +145,44 @@ async def forward_chat_completion(user: Dict[str, Any], payload: Dict[str, Any],
                                   reservation_id: int = 0):
     """
     Handles queuing and reverse-proxying [OI]-compatible chat completion
-    requests to the master 9Router upstream.
+    requests to the resolved upstream (9Router for free, the premium provider
+    for billed models).
+
+    The client's model id (``public_model``) is kept for billing and for every
+    response we emit. Only the outbound copy of the payload carries the
+    provider's real model name, so the origin never leaks.
     """
-    upstream_url = get_setting("master_router_url", settings.MASTER_ROUTER_URL).rstrip("/") + "/v1/chat/completions"
-    upstream_key = get_setting("master_router_key", settings.MASTER_ROUTER_KEY)
+    public_model = payload.get("model", "unknown")
+    upstream_url, upstream_key, provider_model = resolve_upstream(public_model)
 
     is_stream = payload.get("stream", False)
-    model = payload.get("model", "unknown")
 
-    async with REQUEST_SEMAPHORE:
+    # Reserve capacity: a per-user slot first (fairness), then a slot in the
+    # pool for this upstream (free vs premium). The slot is held only until the
+    # upstream response starts; for streams the transfer then runs unbuffered.
+    pool = await acquire_slot(user["id"], is_premium_model(public_model))
+    try:
         start_time = time.time()
         headers = {
             "Authorization": f"Bearer {upstream_key}",
             "Content-Type": "application/json"
         }
 
+        # Never mutate the caller's payload: build the outbound copy explicitly.
+        outbound = dict(payload)
+        outbound["model"] = provider_model
         # Ensure upstream streams include usage statistics if possible
-        if is_stream and "stream_options" not in payload:
-            payload["stream_options"] = {"include_usage": True}
+        if is_stream and "stream_options" not in outbound:
+            outbound["stream_options"] = {"include_usage": True}
 
         client = httpx.AsyncClient(timeout=180.0)
 
         if is_stream:
-            return await handle_streaming_proxy(client, upstream_url, headers, payload, user, model, start_time, reservation_id)
+            return await handle_streaming_proxy(client, upstream_url, headers, outbound, user, public_model, start_time, reservation_id)
         else:
-            return await handle_non_streaming_proxy(client, upstream_url, headers, payload, user, model, start_time, reservation_id)
+            return await handle_non_streaming_proxy(client, upstream_url, headers, outbound, user, public_model, start_time, reservation_id)
+    finally:
+        await release_slot(user["id"], pool)
 
 
 def _aggregate_sse(raw_text: str, model: str) -> Dict[str, Any]:
@@ -172,7 +255,7 @@ async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, header
         if resp.status_code != 200:
             # Nothing was consumed upstream: drop the hold immediately.
             release_reservation(reservation_id)
-            return resp.status_code, "application/json", resp.content
+            return _sanitize_error(resp.status_code, resp.content)
 
         raw_text = resp.text.strip()
         content_type = resp.headers.get("content-type", "")
@@ -189,7 +272,7 @@ async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, header
                     source = "estimated"
                 record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency,
                              status_code=200, usage_source=source, reservation_id=reservation_id)
-                return 200, "application/json", json.dumps(aggregated).encode("utf-8")
+                return 200, "application/json", json.dumps(aggregated, ensure_ascii=False).encode("utf-8")
 
         if "data: [DONE]" in raw_text:
             raw_text = raw_text.split("data: [DONE]")[0].strip()
@@ -197,12 +280,14 @@ async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, header
         first_brace = raw_text.find("{")
         last_brace = raw_text.rfind("}")
         if first_brace != -1 and last_brace != -1:
-            clean_json_str = raw_text[first_brace:last_brace+1]
-            data = json.loads(clean_json_str)
-            clean_bytes = clean_json_str.encode("utf-8")
+            data = json.loads(raw_text[first_brace:last_brace+1])
         else:
             data = resp.json()
-            clean_bytes = resp.content
+
+        # Never echo the provider's own model name back to the client.
+        if isinstance(data, dict):
+            data["model"] = model
+        clean_bytes = json.dumps(data, ensure_ascii=False).encode("utf-8")
 
         tokens_in, tokens_out = _token_breakdown(data.get("usage") or {})
         source = "upstream"
@@ -213,7 +298,7 @@ async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, header
 
         record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency,
                      status_code=200, usage_source=source, reservation_id=reservation_id)
-        return resp.status_code, "application/json", clean_bytes
+        return 200, "application/json", clean_bytes
     except Exception:
         release_reservation(reservation_id)
         raise
@@ -230,27 +315,38 @@ async def handle_streaming_proxy(client: httpx.AsyncClient, url: str, headers: d
         await resp.aclose()
         await client.aclose()
         release_reservation(reservation_id)
-        return resp.status_code, "application/json", err_content
+        return _sanitize_error(resp.status_code, err_content)
 
     async def stream_generator() -> AsyncGenerator[bytes, None]:
+        # Incremental decoder so a multi-byte UTF-8 character split across two
+        # transport chunks is not corrupted when we re-emit the stream.
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        buffer = ""
         tokens_in = 0
         tokens_out = 0
         collected_chunks = 0
         settled = False
         try:
             async for chunk in resp.aiter_raw():
-                yield chunk
-                # Parse SSE usage if available
-                chunk_str = chunk.decode("utf-8", errors="ignore")
-                for line in chunk_str.split("\n"):
-                    if line.startswith("data: ") and not line.strip().endswith("[DONE]"):
+                buffer += decoder.decode(chunk)
+                # Re-emit whole lines so the provider's model name can be
+                # replaced with our public id on every SSE event.
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    raw_line = line.rstrip("\r")
+                    if raw_line.startswith("data: ") and not raw_line.strip().endswith("[DONE]"):
                         try:
-                            parsed = json.loads(line[6:].strip())
+                            parsed = json.loads(raw_line[6:].strip())
                             if parsed.get("usage"):
                                 tokens_in, tokens_out = _token_breakdown(parsed["usage"])
                             collected_chunks += 1
                         except Exception:
                             pass
+                    yield (_rewrite_sse_line(line, model) + "\n").encode("utf-8")
+
+            tail = buffer + decoder.decode(b"", final=True)
+            if tail:
+                yield _rewrite_sse_line(tail, model).encode("utf-8")
 
             # Fallback estimation if upstream didn't send usage in stream
             source = "upstream"

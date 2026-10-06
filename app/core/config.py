@@ -15,9 +15,14 @@ class Settings:
     # Database
     DATABASE_PATH: str = os.path.join(BASE_DIR, "portal.db")
     
-    # 9Router Upstream Bridge
+    # 9Router Upstream Bridge (free models)
     MASTER_ROUTER_URL: str = os.getenv("MASTER_ROUTER_URL", "https://api.thirx.com").rstrip("/")
     MASTER_ROUTER_KEY: str = os.getenv("MASTER_ROUTER_KEY", "sk-f73d7eb77e144c2b-k4aj7o-97d09de1")
+
+    # Premium (xHigh) upstream provider, routed separately from the free bridge.
+    # May include or omit a trailing "/v1"; it is normalised when building URLs.
+    PREMIUM_UPSTREAM_URL: str = os.getenv("PREMIUM_UPSTREAM_URL", "https://api.inferhub.dev/v1")
+    PREMIUM_UPSTREAM_KEY: str = os.getenv("PREMIUM_UPSTREAM_KEY", "")
     
     # Discord OAuth2
     DISCORD_CLIENT_ID: str = os.getenv("DISCORD_CLIENT_ID", "")
@@ -26,7 +31,15 @@ class Settings:
     
     # Business Rules
     # Free models are unlimited; the wallet only pays for premium (xHigh) usage.
-    CONCURRENCY_LIMIT: int = int(os.getenv("CONCURRENCY_LIMIT", "10"))
+    #
+    # Concurrency is split into two independent pools so each can be tuned to the
+    # real capacity of its own upstream (9Router absorbs far more parallel calls
+    # than the premium provider's advertised rate limit). A per-user cap stops a
+    # single account from monopolising a pool. All three are editable live from
+    # the Admin panel; these env values are only the initial defaults.
+    FREE_CONCURRENCY_LIMIT: int = int(os.getenv("FREE_CONCURRENCY_LIMIT", "40"))
+    PREMIUM_CONCURRENCY_LIMIT: int = int(os.getenv("PREMIUM_CONCURRENCY_LIMIT", "30"))
+    PER_USER_CONCURRENCY_LIMIT: int = int(os.getenv("PER_USER_CONCURRENCY_LIMIT", "5"))
     # Premium models get this many free tokens per day before wallet billing kicks in.
     PREMIUM_TRIAL_TOKENS_PER_DAY: int = int(os.getenv("PREMIUM_TRIAL_TOKENS_PER_DAY", "1000000"))
     # Admission control: the most a single premium request may generate is capped
