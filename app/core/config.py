@@ -67,3 +67,9 @@ class Settings:
     SLIPOK_API_KEY: str = os.getenv("SLIPOK_API_KEY", "SLIPOK4JOF2LJ")
 
 settings = Settings()
+
+# Synchronize process and C runtime timezone for SQLite datetime('now', 'localtime')
+import time
+if hasattr(time, "tzset"):
+    os.environ["TZ"] = settings.TIMEZONE
+    time.tzset()
