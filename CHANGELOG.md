@@ -10,7 +10,10 @@ Newest entries on top. Keep it short — facts, not prose.
   `app/core/catalog.py`; `max_output_tokens` intentionally omitted so it falls
   back to the global `PREMIUM_MAX_OUTPUT_TOKENS`. Added `claude` → `anthropic`
   to `_owner()` and the model to the README premium table.
-- [next] Verify `` actually resolves upstream on 9Router (id is sent verbatim).
+- [done] Verified live: `GET /v1/models` + dashboard card render the new model
+  (tier xhigh, owned_by anthropic, $0.50/$2.50, save 90%, trial 100,000); id
+  resolves on 9Router (272 upstream models, ctx 200,000) and a real upstream
+  chat completion returned 200/"OK".
 - [done] Repo baseline reviewed: FastAPI gateway, SQLite WAL, catalog in
   `app/core/catalog.py`, settlement via `record_usage()` in
   `app/services/user_service.py`.
