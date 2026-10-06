@@ -14,8 +14,9 @@ Newest entries on top. Keep it short — facts, not prose.
   (tier xhigh, owned_by anthropic, $0.50/$2.50, save 90%, trial 100,000); id
   resolves on 9Router (272 upstream models, ctx 200,000) and a real upstream
   chat completion returned 200/"OK".
-- [fix] Dashboard display `name` now matches the model `id` exactly (was the
-  placeholder "the model 4.6").
+- [fix] Dashboard display `name` now matches the model `id` exactly for BOTH
+  premium models (was the placeholder "the model 4.6"; DeepSeek renamed from
+  "DeepSeek V4.1 Flash").
 - [done] Repo baseline reviewed: FastAPI gateway, SQLite WAL, catalog in
   `app/core/catalog.py`, settlement via `record_usage()` in
   `app/services/user_service.py`.

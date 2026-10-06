@@ -27,7 +27,7 @@ FREE_MODELS = [
 PREMIUM_MODELS = [
     {
         "id": "deepseek-v4.1-flash",
-        "name": "DeepSeek V4.1 Flash",
+        "name": "deepseek-v4.1-flash",
         "provider": "DeepSeek",
         "tag": "Flagship Reasoning",
         "price_in_usd": 0.015,    # our price, per 1M input tokens
