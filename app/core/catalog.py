@@ -39,7 +39,7 @@ PREMIUM_MODELS = [
     },
     {
         "id": "claude-opus-4-6",
-        "name": "the model 4.6",
+        "name": "claude-opus-4-6",
         "provider": "Anthropic",
         "tag": "Frontier Agentic",
         "price_in_usd": 0.50,     # our price, per 1M input tokens
