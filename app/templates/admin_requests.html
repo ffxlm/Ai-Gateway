@@ -75,7 +75,7 @@
             </div>
             <div class="p-3.5 rounded-xl bg-zinc-900/70 border border-zinc-800 space-y-1">
                 <div class="text-[11px] text-zinc-400 uppercase tracking-wider">Charged (USD)</div>
-                <div class="text-sm sm:text-base font-bold font-mono text-amber-300 truncate">${{ summary.cost_usd | usd }} <span class="text-[10px] font-normal text-zinc-500">· ฿{{ summary.cost_usd | thb(usd_to_thb) }}</span></div>
+                <div class="text-sm sm:text-base font-bold font-mono text-amber-300 truncate">${{ summary.cost_usd | usd }} <span class="text-[10px] font-normal text-zinc-500">· ฿{{ summary.cost_usd | thb(usd_to_thb) }}</span>{% if summary.unbilled_usd %} <span class="text-[10px] font-normal text-rose-400">+ ${{ summary.unbilled_usd | usd }} unbilled</span>{% endif %}</div>
             </div>
         </div>
 
@@ -185,7 +185,7 @@
                             <td class="py-2.5 px-3 text-right font-mono text-zinc-300">{{ "{:,}".format(r.tokens_out or 0) }}</td>
                             <td class="py-2.5 px-3 text-right font-mono {% if r.trial_tokens %}text-violet-300{% else %}text-zinc-600{% endif %}">{{ "{:,}".format(r.trial_tokens or 0) }}</td>
                             <td class="py-2.5 px-3 text-right font-mono {% if r.paid_tokens %}text-amber-300{% else %}text-zinc-600{% endif %}">{{ "{:,}".format(r.paid_tokens or 0) }}</td>
-                            <td class="py-2.5 px-3 text-right font-mono {% if r.cost_usd %}text-amber-300 font-semibold{% else %}text-zinc-600{% endif %}">${{ r.cost_usd | usd }}</td>
+                            <td class="py-2.5 px-3 text-right font-mono {% if r.cost_usd %}text-amber-300 font-semibold{% else %}text-zinc-600{% endif %}">${{ r.cost_usd | usd }}{% if r.unbilled_usd %} <span class="text-[10px] text-rose-400" title="Unbilled (could not be collected): ${{ r.unbilled_usd | usd }}">+${{ r.unbilled_usd | usd }} unbilled</span>{% endif %}</td>
                             <td class="py-2.5 px-3 text-right font-mono text-zinc-400">${{ r.balance_after | usd }}</td>
                             <td class="py-2.5 px-3">
                                 {% if r.usage_source == 'estimated' %}

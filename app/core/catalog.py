@@ -5,6 +5,8 @@ Both the public dashboard (``app.routers.pages``) and the API layer
 premium model lists can never drift apart.
 """
 
+from app.core.config import settings
+
 # Free tier: unlimited usage, never charged against the wallet.
 FREE_MODELS = [
     "deepseek-v4-flash",
@@ -18,6 +20,10 @@ FREE_MODELS = [
 # When omitted (as for DeepSeek below) the global ``premium_trial_tokens_per_day``
 # setting is used instead, so the Admin panel stays in control of the default.
 # Set it to 0 to give a model no free trial at all.
+#
+# ``max_output_tokens`` bounds the admission-control estimate: a request can
+# never reserve more than this many output tokens, which is what keeps a single
+# request from ever driving the wallet negative.
 PREMIUM_MODELS = [
     {
         "id": "deepseek-v4.1-flash",
@@ -29,6 +35,7 @@ PREMIUM_MODELS = [
         "official_in_usd": 0.15,  # official list price, struck through on the card
         "official_out_usd": 0.60,
         "discount": 90,           # % cheaper than official
+        "max_output_tokens": 32768,
     },
 ]
 
@@ -58,6 +65,23 @@ def premium_price(model_id: str, tokens_in: int, tokens_out: int) -> float:
         return 0.0
     return (max(tokens_in, 0) / 1_000_000.0) * m["price_in_usd"] + \
            (max(tokens_out, 0) / 1_000_000.0) * m["price_out_usd"]
+
+
+def premium_output_price(model_id: str) -> float:
+    """USD per 1M output tokens (the pricier side, used for worst-case holds)."""
+    m = _PREMIUM_BY_ID.get(model_id)
+    return float(m["price_out_usd"]) if m else 0.0
+
+
+def premium_max_output_tokens(model_id: str) -> int:
+    """Hard cap on generated tokens for admission control (per-model or global)."""
+    m = _PREMIUM_BY_ID.get(model_id)
+    if m and m.get("max_output_tokens"):
+        try:
+            return max(int(m["max_output_tokens"]), 1)
+        except (TypeError, ValueError):
+            pass
+    return max(int(settings.PREMIUM_MAX_OUTPUT_TOKENS), 1)
 
 
 def _owner(model_id: str) -> str:

@@ -128,6 +128,23 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now', 'localtime'))
         );
         """)
+
+        # 7. Wallet Reservations: short-lived holds that stop concurrent requests
+        #    from spending the same dollars twice. ``available = balance - active
+        #    holds``. A hold that is never settled (e.g. the process crashed
+        #    mid-request) simply expires; it never touches the balance or ledger.
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS wallet_reservations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            model TEXT NOT NULL,
+            reserved_usd REAL NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at TEXT DEFAULT (datetime('now', 'localtime')),
+            expires_at TEXT NOT NULL
+        );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_wallet_reservations_active ON wallet_reservations (user_id, status, expires_at);")
         
         # Seed default settings if not exists
         default_settings = {
@@ -163,6 +180,7 @@ def _migrate_observability(cursor):
         ("trial_tokens", "INTEGER DEFAULT 0"),
         ("paid_tokens", "INTEGER DEFAULT 0"),
         ("cost_usd", "REAL DEFAULT 0"),
+        ("unbilled_usd", "REAL DEFAULT 0"),
         ("is_premium", "INTEGER DEFAULT 0"),
         ("balance_after", "REAL DEFAULT 0"),
         ("usage_source", "TEXT DEFAULT ''"),
@@ -203,6 +221,21 @@ def _migrate_wallet(cursor):
     cursor.execute("UPDATE request_logs SET model = 'deepseek-v4.1-flash' WHERE model = 'cb/deepseek-v4.1-flash'")
     cursor.execute("UPDATE wallet_transactions SET model = 'deepseek-v4.1-flash' WHERE model = 'cb/deepseek-v4.1-flash'")
     cursor.execute("UPDATE model_trial_usage SET model = 'deepseek-v4.1-flash' WHERE model = 'cb/deepseek-v4.1-flash'")
+
+    # 3b. Write off any negative balances left by the old billing bug (a request
+    #     that straddled the trial boundary could debit below zero). The ledger
+    #     gets an equal-and-opposite credit so reconciliation returns to $0, and
+    #     the write-off is visible as its own transaction rather than a silent
+    #     edit. Idempotent: after this runs, no balance is negative.
+    for row in cursor.execute("SELECT id, balance FROM users WHERE balance < 0").fetchall():
+        deficit = float(row["balance"] or 0)
+        cursor.execute("UPDATE users SET balance = 0 WHERE id = ?", (row["id"],))
+        cursor.execute(
+            """INSERT INTO wallet_transactions
+               (user_id, tx_type, amount_usd, balance_after, description)
+               VALUES (?, 'writeoff', ?, 0, ?)""",
+            (row["id"], -deficit, f"Write-off of negative balance (${-deficit:.6f})"),
+        )
 
     # 4. One-time conversion of previous VIP payments into wallet balance.
     already = cursor.execute("SELECT value FROM system_settings WHERE key = 'wallet_migrated_v1'").fetchone()

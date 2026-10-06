@@ -131,20 +131,109 @@ def add_balance(user_id: str, amount_usd: float, tx_type: str = "topup",
         """, (user_id, tx_type, amount_usd, new_balance, description, trans_ref))
         return new_balance
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Wallet reservations (admission control for in-flight premium requests)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _now_str() -> str:
+    return now_local().strftime("%Y-%m-%d %H:%M:%S")
+
+def _expire_reservations(cursor, now_str: str) -> None:
+    """Retire holds whose request never settled (crash, disconnect, timeout)."""
+    cursor.execute(
+        "UPDATE wallet_reservations SET status = 'expired' "
+        "WHERE status = 'active' AND expires_at <= ?",
+        (now_str,),
+    )
+
+def _active_reserved(cursor, user_id: str) -> float:
+    row = cursor.execute(
+        "SELECT COALESCE(SUM(reserved_usd), 0) AS n FROM wallet_reservations "
+        "WHERE user_id = ? AND status = 'active'",
+        (user_id,),
+    ).fetchone()
+    return float(row["n"] or 0)
+
+def get_reserved_usd(user_id: str) -> float:
+    """USD currently held by this user's in-flight requests."""
+    with db_session(immediate=True) as conn:
+        cursor = conn.cursor()
+        _expire_reservations(cursor, _now_str())
+        return _active_reserved(cursor, user_id)
+
+def reserve_wallet(user_id: str, model: str, amount_usd: float,
+                   ttl_seconds: Optional[int] = None) -> Optional[int]:
+    """Hold ``amount_usd`` against the wallet for one in-flight request.
+
+    Returns the reservation id, ``0`` when no hold is needed (the request is
+    fully covered by the free trial), or ``None`` when the available balance
+    cannot cover the hold.
+
+    The availability check and the insert share a single ``BEGIN IMMEDIATE``
+    transaction, so two concurrent requests can never both pass on the same
+    dollars: ``available = balance - Σ(active holds)``.
+    """
+    amount_usd = max(float(amount_usd or 0.0), 0.0)
+    if amount_usd <= 0:
+        return 0
+    ttl = int(ttl_seconds if ttl_seconds is not None else settings.WALLET_RESERVATION_TTL_SECONDS)
+    now = now_local()
+    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+    expires = (now + timedelta(seconds=ttl)).strftime("%Y-%m-%d %H:%M:%S")
+    with db_session(immediate=True) as conn:
+        cursor = conn.cursor()
+        _expire_reservations(cursor, now_str)
+        row = cursor.execute("SELECT balance FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not row:
+            return None
+        available = float(row["balance"] or 0) - _active_reserved(cursor, user_id)
+        if amount_usd > available + 1e-9:
+            return None
+        cursor.execute(
+            "INSERT INTO wallet_reservations (user_id, model, reserved_usd, status, expires_at) "
+            "VALUES (?, ?, ?, 'active', ?)",
+            (user_id, model, amount_usd, expires),
+        )
+        return int(cursor.lastrowid)
+
+def release_reservation(reservation_id: Optional[int], status: str = "released") -> None:
+    """Release a hold that will not be settled (upstream error, disconnect)."""
+    if not reservation_id:
+        return
+    with db_session(immediate=True) as conn:
+        conn.cursor().execute(
+            "UPDATE wallet_reservations SET status = ? WHERE id = ? AND status = 'active'",
+            (status, int(reservation_id)),
+        )
+
+
 def record_usage(user_id: str, model: str, tokens_in: int, tokens_out: int,
                  latency_ms: float = 0.0, status_code: int = 200,
-                 usage_source: str = "upstream") -> float:
+                 usage_source: str = "upstream",
+                 reservation_id: Optional[int] = None) -> float:
     """Log a completed request and settle its cost in one atomic transaction.
 
     Free models are never charged. Premium models consume the daily free trial
     first (input tokens, then output tokens); anything beyond the trial is billed
     from the wallet at the model's per-token rates.
 
-    The trial counter, wallet balance, ledger entry and request-log snapshot are
-    all written inside a single ``BEGIN IMMEDIATE`` transaction, so concurrent
-    requests for the same user cannot double-grant the trial or lose a charge.
+    Two guarantees are enforced here:
 
-    Returns the USD amount charged (0.0 for free models or trial-covered usage).
+    * The wallet can never go below zero. The charge is capped at the current
+      balance (``charge = min(cost, balance)``); whatever cannot be collected is
+      recorded as ``unbilled_usd`` instead of being pushed into a negative
+      balance.
+    * Usage the upstream did not report (``usage_source == 'estimated'``) is
+      never billed from the wallet, because its cost cannot be proven. It still
+      consumes the free trial.
+
+    The trial counter, wallet balance, ledger entry, reservation settlement and
+    request-log snapshot are all written inside a single ``BEGIN IMMEDIATE``
+    transaction, so concurrent requests cannot double-grant the trial or lose a
+    charge.
+
+    Returns the USD amount actually charged (0.0 for free, trial-covered, or
+    unbilled usage).
     """
     tokens_in = max(int(tokens_in or 0), 0)
     tokens_out = max(int(tokens_out or 0), 0)
@@ -154,18 +243,21 @@ def record_usage(user_id: str, model: str, tokens_in: int, tokens_out: int,
     limit = premium_trial_limit(model) if is_premium else 0
     today = get_today_str()
 
-    cost = 0.0
     trial_tokens = 0
     paid_tokens = 0
     paid_in = 0
     paid_out = 0
+    charge = 0.0
+    unbilled = 0.0
+    balance_before = 0.0
     balance_after = 0.0
 
     with db_session(immediate=True) as conn:
         cursor = conn.cursor()
         row = cursor.execute("SELECT balance FROM users WHERE id = ?", (user_id,)).fetchone()
         if row:
-            balance_after = float(row["balance"] or 0)
+            balance_before = float(row["balance"] or 0)
+            balance_after = balance_before
 
         if is_premium and row:
             used_row = cursor.execute(
@@ -184,9 +276,16 @@ def record_usage(user_id: str, model: str, tokens_in: int, tokens_out: int,
             trial_tokens = free_in + free_out
             paid_tokens = paid_in + paid_out
 
-            cost = premium_price(model, paid_in, paid_out)
-            if cost > 0:
-                balance_after -= cost
+            # Theoretical cost of the billed (post-trial) tokens.
+            theoretical = premium_price(model, paid_in, paid_out)
+            if usage_source == "estimated":
+                # Unverifiable usage is never charged; it shows up as unbilled.
+                charge = 0.0
+            else:
+                # Cap at the balance so the wallet can never go negative.
+                charge = min(theoretical, max(balance_before, 0.0))
+            unbilled = round(theoretical - charge, 12)
+            balance_after = balance_before - charge
 
             # Accumulate today's trial usage for this model only.
             cursor.execute("""
@@ -198,25 +297,33 @@ def record_usage(user_id: str, model: str, tokens_in: int, tokens_out: int,
 
             cursor.execute(
                 "UPDATE users SET balance = ?, total_spent = total_spent + ? WHERE id = ?",
-                (balance_after, cost, user_id),
+                (balance_after, charge, user_id),
             )
-            if cost > 0:
+            if charge > 0:
                 cursor.execute("""
                 INSERT INTO wallet_transactions
                 (user_id, tx_type, amount_usd, balance_after, description, model, tokens_in, tokens_out)
                 VALUES (?, 'usage', ?, ?, ?, ?, ?, ?)
-                """, (user_id, -cost, balance_after, f"{total_tokens:,} tokens", model, paid_in, paid_out))
+                """, (user_id, -charge, balance_after, f"{total_tokens:,} tokens", model, paid_in, paid_out))
+
+        # Settle this request's hold, if any, in the same transaction.
+        if reservation_id:
+            cursor.execute(
+                "UPDATE wallet_reservations SET status = 'settled' WHERE id = ? AND status = 'active'",
+                (int(reservation_id),),
+            )
 
         # Full per-request audit snapshot (written in the same transaction).
         cursor.execute("""
         INSERT INTO request_logs
         (user_id, model, tokens_used, tokens_in, tokens_out, trial_tokens, paid_tokens,
-         cost_usd, is_premium, balance_after, usage_source, latency_ms, status_code)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         cost_usd, unbilled_usd, is_premium, balance_after, usage_source, latency_ms, status_code)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (user_id, model, total_tokens, tokens_in, tokens_out, trial_tokens, paid_tokens,
-              cost, 1 if is_premium else 0, balance_after, usage_source, latency_ms, status_code))
+              charge, unbilled, 1 if is_premium else 0, balance_after, usage_source,
+              latency_ms, status_code))
 
-    return cost
+    return charge
 
 
 def log_rejected_request(user_id: str, model: str, status_code: int) -> None:
@@ -508,7 +615,8 @@ def get_request_summary(user_id=None, user_q=None, model=None, date_from=None, d
                COALESCE(SUM(r.tokens_out), 0) AS tokens_out,
                COALESCE(SUM(r.trial_tokens), 0) AS trial_tokens,
                COALESCE(SUM(r.paid_tokens), 0) AS paid_tokens,
-               COALESCE(SUM(r.cost_usd), 0) AS cost_usd
+               COALESCE(SUM(r.cost_usd), 0) AS cost_usd,
+               COALESCE(SUM(r.unbilled_usd), 0) AS unbilled_usd
         FROM request_logs r{where}
         """, params).fetchone()
         return dict(row)
@@ -558,9 +666,14 @@ def get_reconciliation() -> List[Dict[str, Any]]:
     ``spent_diff`` compares ``users.total_spent`` with the sum of per-request
     ``cost_usd``; it is non-zero for premium usage that predates the audit
     migration (those old request rows carry the column default 0).
+
+    Also reports ``reserved_usd`` (money held by in-flight requests) and
+    ``unbilled_usd`` (premium cost that could not be collected and was recorded
+    instead of driving the balance negative).
     """
     with db_session() as conn:
         cursor = conn.cursor()
+        _expire_reservations(cursor, _now_str())
         users = [dict(r) for r in cursor.execute(
             "SELECT id, username, avatar_url, balance, total_topped_up, total_spent "
             "FROM users ORDER BY username COLLATE NOCASE"
@@ -584,4 +697,13 @@ def get_reconciliation() -> List[Dict[str, Any]]:
             ).fetchone()["n"]
             u["logged_cost"] = float(logged or 0)
             u["spent_diff"] = round(float(u["total_spent"] or 0) - float(logged or 0), 8)
+
+            # Money held by in-flight requests, and premium cost that could not be
+            # collected (billed up to the balance, remainder recorded as unbilled).
+            u["reserved_usd"] = _active_reserved(cursor, u["id"])
+            unbilled = cursor.execute(
+                "SELECT COALESCE(SUM(unbilled_usd), 0) AS n FROM request_logs WHERE user_id = ? AND is_premium = 1",
+                (u["id"],),
+            ).fetchone()["n"]
+            u["unbilled_usd"] = float(unbilled or 0)
         return users

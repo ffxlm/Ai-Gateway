@@ -364,6 +364,8 @@
                             <th class="py-2.5 px-3 text-right">Spent (recorded)</th>
                             <th class="py-2.5 px-3 text-right">Cost in Logs</th>
                             <th class="py-2.5 px-3 text-right">Spent Diff</th>
+                            <th class="py-2.5 px-3 text-right" title="Money held by requests still in flight">Reserved</th>
+                            <th class="py-2.5 px-3 text-right" title="Premium cost that could not be collected (recorded instead of driving the balance negative)">Unbilled</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-800/60 text-zinc-300">
@@ -385,10 +387,12 @@
                             <td class="py-2.5 px-3 text-right font-mono {% if r.spent_diff != 0 %}text-zinc-500{% else %}text-emerald-400{% endif %}" title="Non-zero only for premium usage recorded before the audit migration">
                                 {% if r.spent_diff != 0 %}{{ r.spent_diff }}{% else %}OK{% endif %}
                             </td>
+                            <td class="py-2.5 px-3 text-right font-mono {% if r.reserved_usd %}text-sky-300{% else %}text-zinc-600{% endif %}">${{ r.reserved_usd | usd }}</td>
+                            <td class="py-2.5 px-3 text-right font-mono {% if r.unbilled_usd %}text-rose-300{% else %}text-zinc-600{% endif %}">${{ r.unbilled_usd | usd }}</td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="7" class="py-6 text-center text-zinc-500">No users yet.</td>
+                            <td colspan="9" class="py-6 text-center text-zinc-500">No users yet.</td>
                         </tr>
                         {% endfor %}
                     </tbody>

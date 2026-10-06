@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Request, HTTPException, Header, Depends
 from fastapi.responses import JSONResponse, StreamingResponse, Response
-from app.services.user_service import get_user_by_api_key, premium_trial_remaining, log_rejected_request
-from app.services.proxy_service import forward_chat_completion, fetch_upstream_models
-from app.core.catalog import is_premium_model
+from app.services.user_service import (
+    get_user_by_api_key, premium_trial_remaining, log_rejected_request,
+    reserve_wallet, release_reservation, get_reserved_usd,
+)
+from app.services.proxy_service import forward_chat_completion, fetch_upstream_models, estimate_request_tokens
+from app.core.catalog import is_premium_model, premium_output_price
 
 gateway_router = APIRouter(prefix="/v1", tags=["[OI] Gateway"])
 
@@ -45,20 +48,62 @@ async def chat_completions(request: Request, user: dict = Depends(get_current_ap
 
     # Premium (xHigh) models are billed from the USD wallet, but each user gets a
     # daily free trial allowance first. Free models are unlimited.
+    #
+    # Admission control runs BEFORE the upstream call and is cost-aware, so a
+    # single request can never debit past zero:
+    #   * While trial remains, the request is never rejected (the trial may
+    #     cover it); the balance only holds whatever it can against the overage.
+    #   * Once the trial is exhausted, the wallet must fully cover the worst-case
+    #     token cost, which is held so concurrent requests cannot double-spend.
     model = payload.get("model", "")
+    reservation_id = 0
     if is_premium_model(model):
-        if premium_trial_remaining(user["id"], model) <= 0 and float(user.get("balance") or 0) <= 0:
-            log_rejected_request(user["id"], model, 402)
-            raise HTTPException(
-                status_code=402,
-                detail={"error": {
-                    "message": f"Daily free trial used up and wallet balance is empty. Top up to keep using '{model}'.",
-                    "type": "insufficient_balance",
-                    "code": 402,
-                }}
-            )
+        est_in, est_out = estimate_request_tokens(payload, model)
+        est_total = est_in + est_out
+        trial_remaining = premium_trial_remaining(user["id"], model)
+        balance = float(user.get("balance") or 0)
+        available = max(balance - get_reserved_usd(user["id"]), 0.0)
+        # Convert USD to tokens at the priciest (output) rate, for a worst case.
+        price_per_token = premium_output_price(model) / 1_000_000.0
 
-    status_code, content_type, result = await forward_chat_completion(user, payload)
+        if trial_remaining <= 0:
+            # Wallet-only mode: it must cover the whole worst case.
+            required = round(est_total * price_per_token, 8)
+            if available <= 0 or required > available + 1e-9:
+                log_rejected_request(user["id"], model, 402)
+                raise HTTPException(
+                    status_code=402,
+                    detail={"error": {
+                        "message": f"Daily free trial used up and wallet balance is too low to cover this request for '{model}'. Top up or lower max_tokens.",
+                        "type": "insufficient_balance",
+                        "code": 402,
+                    }}
+                )
+            reservation_id = reserve_wallet(user["id"], model, required)
+            if reservation_id is None:
+                log_rejected_request(user["id"], model, 402)
+                raise HTTPException(
+                    status_code=402,
+                    detail={"error": {
+                        "message": f"Insufficient available balance to cover this request for '{model}'. Top up or lower max_tokens.",
+                        "type": "insufficient_balance",
+                        "code": 402,
+                    }}
+                )
+        else:
+            # Trial-first: hold only what the balance can cover of the overage.
+            # A request the trial might fully satisfy is never rejected here.
+            billable_est = max(est_total - trial_remaining, 0)
+            hold = round(min(billable_est * price_per_token, available), 8)
+            if hold > 0:
+                reservation_id = reserve_wallet(user["id"], model, hold) or 0
+
+    try:
+        status_code, content_type, result = await forward_chat_completion(user, payload, reservation_id)
+    except Exception:
+        # The request never reached settlement: release the hold immediately.
+        release_reservation(reservation_id)
+        raise
 
     if content_type == "text/event-stream":
         return StreamingResponse(result, media_type="text/event-stream")

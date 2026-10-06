@@ -316,7 +316,7 @@ async def admin_requests_export(request: Request):
     writer.writerow([
         "time", "user_id", "username", "model", "premium",
         "tokens_in", "tokens_out", "tokens_total", "trial_tokens", "paid_tokens",
-        "cost_usd", "balance_after", "usage_source", "status_code", "latency_ms",
+        "cost_usd", "unbilled_usd", "balance_after", "usage_source", "status_code", "latency_ms",
     ])
     for r in rows:
         writer.writerow([
@@ -324,7 +324,7 @@ async def admin_requests_export(request: Request):
             1 if r.get("is_premium") else 0,
             r.get("tokens_in"), r.get("tokens_out"), r.get("tokens_used"),
             r.get("trial_tokens"), r.get("paid_tokens"),
-            r.get("cost_usd"), r.get("balance_after"), r.get("usage_source"),
+            r.get("cost_usd"), r.get("unbilled_usd"), r.get("balance_after"), r.get("usage_source"),
             r.get("status_code"), r.get("latency_ms"),
         ])
 

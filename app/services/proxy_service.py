@@ -5,11 +5,58 @@ import httpx
 from typing import AsyncGenerator, Dict, Any, Tuple
 from app.core.config import settings
 from app.core.database import get_setting
-from app.core.catalog import api_models
-from app.services.user_service import record_usage
+from app.core.catalog import api_models, premium_max_output_tokens
+from app.services.user_service import record_usage, release_reservation
 
 # Concurrency control: one shared queue for every request.
 REQUEST_SEMAPHORE = asyncio.Semaphore(settings.CONCURRENCY_LIMIT)
+
+
+def _count_text_tokens(text: Any) -> int:
+    """Rough token estimate for a string (~4 chars/token)."""
+    if not isinstance(text, str) or not text:
+        return 0
+    return max(len(text) // 4, 1)
+
+
+def estimate_prompt_tokens(payload: Dict[str, Any]) -> int:
+    """Estimate input tokens from the request payload for admission control.
+
+    Deliberately conservative and cheap: no tokenizer dependency, just a
+    character heuristic plus a small per-message overhead.
+    """
+    total = 0
+    for msg in payload.get("messages") or []:
+        if not isinstance(msg, dict):
+            continue
+        total += 4  # per-message role/format overhead
+        content = msg.get("content")
+        if isinstance(content, str):
+            total += _count_text_tokens(content)
+        elif isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict):
+                    total += _count_text_tokens(part.get("text") or "")
+        if msg.get("name"):
+            total += _count_text_tokens(str(msg["name"]))
+    for tool in payload.get("tools") or []:
+        try:
+            total += _count_text_tokens(json.dumps(tool))
+        except (TypeError, ValueError):
+            pass
+    return total
+
+
+def estimate_request_tokens(payload: Dict[str, Any], model: str) -> Tuple[int, int]:
+    """Worst-case (input, output) token estimate used to size the wallet hold."""
+    est_in = estimate_prompt_tokens(payload)
+    try:
+        requested = int(payload.get("max_tokens") or payload.get("max_completion_tokens") or 0)
+    except (TypeError, ValueError):
+        requested = 0
+    cap = premium_max_output_tokens(model)
+    est_out = requested if 0 < requested <= cap else cap
+    return est_in, est_out
 
 
 def _token_breakdown(usage: Dict[str, Any]) -> Tuple[int, int]:
@@ -24,7 +71,8 @@ def _token_breakdown(usage: Dict[str, Any]) -> Tuple[int, int]:
     return prompt, completion
 
 
-async def forward_chat_completion(user: Dict[str, Any], payload: Dict[str, Any]):
+async def forward_chat_completion(user: Dict[str, Any], payload: Dict[str, Any],
+                                  reservation_id: int = 0):
     """
     Handles queuing and reverse-proxying [OI]-compatible chat completion
     requests to the master 9Router upstream.
@@ -49,9 +97,9 @@ async def forward_chat_completion(user: Dict[str, Any], payload: Dict[str, Any])
         client = httpx.AsyncClient(timeout=180.0)
 
         if is_stream:
-            return await handle_streaming_proxy(client, upstream_url, headers, payload, user, model, start_time)
+            return await handle_streaming_proxy(client, upstream_url, headers, payload, user, model, start_time, reservation_id)
         else:
-            return await handle_non_streaming_proxy(client, upstream_url, headers, payload, user, model, start_time)
+            return await handle_non_streaming_proxy(client, upstream_url, headers, payload, user, model, start_time, reservation_id)
 
 
 def _aggregate_sse(raw_text: str, model: str) -> Dict[str, Any]:
@@ -116,12 +164,14 @@ def _aggregate_sse(raw_text: str, model: str) -> Dict[str, Any]:
     return result
 
 
-async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, headers: dict, payload: dict, user: dict, model: str, start_time: float):
+async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, headers: dict, payload: dict, user: dict, model: str, start_time: float, reservation_id: int = 0):
     try:
         resp = await client.post(url, headers=headers, json=payload)
         latency = (time.time() - start_time) * 1000
 
         if resp.status_code != 200:
+            # Nothing was consumed upstream: drop the hold immediately.
+            release_reservation(reservation_id)
             return resp.status_code, "application/json", resp.content
 
         raw_text = resp.text.strip()
@@ -138,7 +188,7 @@ async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, header
                     tokens_out = max(len(content) // 4 + 50, 100)
                     source = "estimated"
                 record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency,
-                             status_code=200, usage_source=source)
+                             status_code=200, usage_source=source, reservation_id=reservation_id)
                 return 200, "application/json", json.dumps(aggregated).encode("utf-8")
 
         if "data: [DONE]" in raw_text:
@@ -162,13 +212,16 @@ async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, header
             source = "estimated"
 
         record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency,
-                     status_code=200, usage_source=source)
+                     status_code=200, usage_source=source, reservation_id=reservation_id)
         return resp.status_code, "application/json", clean_bytes
+    except Exception:
+        release_reservation(reservation_id)
+        raise
     finally:
         await client.aclose()
 
 
-async def handle_streaming_proxy(client: httpx.AsyncClient, url: str, headers: dict, payload: dict, user: dict, model: str, start_time: float):
+async def handle_streaming_proxy(client: httpx.AsyncClient, url: str, headers: dict, payload: dict, user: dict, model: str, start_time: float, reservation_id: int = 0):
     req = client.build_request("POST", url, headers=headers, json=payload)
     resp = await client.send(req, stream=True)
 
@@ -176,12 +229,14 @@ async def handle_streaming_proxy(client: httpx.AsyncClient, url: str, headers: d
         err_content = await resp.aread()
         await resp.aclose()
         await client.aclose()
+        release_reservation(reservation_id)
         return resp.status_code, "application/json", err_content
 
     async def stream_generator() -> AsyncGenerator[bytes, None]:
         tokens_in = 0
         tokens_out = 0
         collected_chunks = 0
+        settled = False
         try:
             async for chunk in resp.aiter_raw():
                 yield chunk
@@ -205,8 +260,13 @@ async def handle_streaming_proxy(client: httpx.AsyncClient, url: str, headers: d
 
             latency = (time.time() - start_time) * 1000
             record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency,
-                         status_code=200, usage_source=source)
+                         status_code=200, usage_source=source, reservation_id=reservation_id)
+            settled = True
         finally:
+            if not settled:
+                # Client disconnected or the stream errored before settlement:
+                # free the hold now instead of waiting for it to expire.
+                release_reservation(reservation_id)
             await resp.aclose()
             await client.aclose()
 

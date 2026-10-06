@@ -29,6 +29,14 @@ class Settings:
     CONCURRENCY_LIMIT: int = int(os.getenv("CONCURRENCY_LIMIT", "10"))
     # Premium models get this many free tokens per day before wallet billing kicks in.
     PREMIUM_TRIAL_TOKENS_PER_DAY: int = int(os.getenv("PREMIUM_TRIAL_TOKENS_PER_DAY", "1000000"))
+    # Admission control: the most a single premium request may generate is capped
+    # here (per-model override possible in the catalog). Without a cap the
+    # pre-flight budget check could not bound a request's worst-case cost.
+    PREMIUM_MAX_OUTPUT_TOKENS: int = int(os.getenv("PREMIUM_MAX_OUTPUT_TOKENS", "32768"))
+    # How long a wallet reservation is held while its request is in flight.
+    # Must comfortably exceed the 180s upstream timeout; a crashed request
+    # frees its hold automatically once this elapses.
+    WALLET_RESERVATION_TTL_SECONDS: int = int(os.getenv("WALLET_RESERVATION_TTL_SECONDS", "600"))
     USD_TO_THB: float = float(os.getenv("USD_TO_THB", "35"))
     MIN_TOPUP_THB: int = int(os.getenv("MIN_TOPUP_THB", "10"))
     # Comma-separated THB quick-pick amounts shown in the top-up modal.
