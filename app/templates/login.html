@@ -4,14 +4,23 @@
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
+    <script>
+    // Pre-paint gate for scroll reveals: hide .reveal only when the observer will
+    // actually reveal it, so content never paints fully then fades out and back.
+    (function () {
+        if (!('IntersectionObserver' in window)) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        document.documentElement.classList.add('reveal-ready');
+    })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#08090b">
     <meta name="description" content="One API for your AI workflow. Access unlimited free models, premium intelligence, and transparent prepaid billing with AI Gateway.">
     <title>AI Gateway — A simpler way to build with AI</title>
     <link rel="icon" type="image/svg+xml" href="/static/brand.svg">
-    <link rel="stylesheet" href="/static/design.css?v=5">
+    <link rel="stylesheet" href="/static/design.css?v=6">
     <link rel="stylesheet" href="/static/product-preview.css?v=3">
-    <script src="/static/site.js?v=2" defer></script>
+    <script src="/static/site.js?v=3" defer onerror="document.documentElement.classList.remove('reveal-ready')"></script>
 </head>
 <body class="landing">
     <a class="skip-link" href="#main">Skip to content</a>

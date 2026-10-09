@@ -1,6 +1,20 @@
 /* Application shell — an intentionally different, focused console experience. */
 .console-app { --sidebar-width: 232px; --app-line: #282930; --app-muted: #91939e; background: #101115 !important; display: block !important; }
 .console-app [hidden] { display: none !important; }
+/* Pre-hydration gate: hide every view until console.js hydrates, showing only the
+   active one (resolved from the hash by the inline bootstrap). Uses the token-list
+   selector so multi-view panels like "overview usage" work in both views. */
+.console-app.console-booting [data-console-view] { display: none !important; }
+.console-app.console-booting[data-active-view="overview"] [data-console-view~="overview"],
+.console-app.console-booting[data-active-view="models"] [data-console-view~="models"],
+.console-app.console-booting[data-active-view="api"] [data-console-view~="api"],
+.console-app.console-booting[data-active-view="usage"] [data-console-view~="usage"],
+.console-app.console-booting[data-active-view="wallet"] [data-console-view~="wallet"],
+.console-app.console-booting[data-active-view="members"] [data-console-view~="members"],
+.console-app.console-booting[data-active-view="ledger"] [data-console-view~="ledger"],
+.console-app.console-booting[data-active-view="reconciliation"] [data-console-view~="reconciliation"],
+.console-app.console-booting[data-active-view="payments"] [data-console-view~="payments"],
+.console-app.console-booting[data-active-view="settings"] [data-console-view~="settings"] { display: block !important; }
 .console-sidebar { position: fixed; inset: 0 auto 0 0; width: var(--sidebar-width); background: #0c0d10; border-right: 1px solid var(--app-line); z-index: 60; display: flex; flex-direction: column; padding: 25px 14px 12px; overflow-y: auto; }
 .console-workspace { display: flex; gap: 10px; align-items: center; padding: 0 8px 23px; color: #f0eff5; font-weight: 600; font-size: 13px; }
 .console-workspace small { display: block; font-size: 10px; font-weight: 400; color: #838591; margin-top: 4px; }.console-workspace > i { margin-left: auto; font-size: 9px; color: #747681; }

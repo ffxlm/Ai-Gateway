@@ -168,6 +168,7 @@ class PortalUITests(unittest.TestCase):
         self.mock("get_reconciliation", return_value=[])
         admin_response = self.client.get("/admin")
         self.assertEqual(admin_response.status_code, 200)
+        self.assertIn("classList.add('console-booting')", admin_response.text)
         self.assert_no_redundant_navigation(admin_response.text)
         for heading in ["Wallet &amp; top-ups", "Daily free-trial allowances", "Concurrency limits",
                         "API connections &amp; support", "Payment verification"]:
@@ -247,6 +248,32 @@ class PortalUITests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(r'Alex O\u0027Reilly', response.text)
         self.assertNotIn("adjustBalance('ui-test', 'Alex O'Reilly')", response.text)
+
+    def test_reload_avoids_prehydration_content_flash(self):
+        """Guards the pre-paint gates: the console hides non-active views and the
+        landing hides scroll reveals before first paint, so a reload never paints
+        every view stacked (console) or fades content out and back (landing)."""
+        console_css = self.client.get("/static/console.css").text
+        self.assertIn('.console-app.console-booting [data-console-view]', console_css)
+        for view in ["overview", "members", "ledger", "reconciliation", "payments", "settings"]:
+            self.assertIn(f'[data-active-view="{view}"] [data-console-view~="{view}"]', console_css)
+        self.assertIn("classList.remove('console-booting')", self.client.get("/static/console.js").text)
+
+        design_css = self.client.get("/static/design.css").text
+        self.assertIn('.reveal-ready .reveal', design_css)
+        self.assertNotIn('.will-reveal', design_css)
+        self.assertNotIn("classList.add('will-reveal')", self.client.get("/static/site.js").text)
+
+        self.mock("get_session_user", return_value=None)
+        landing = self.client.get("/login")
+        self.assertIn("classList.add('reveal-ready')", landing.text)
+        self.assertIn("classList.remove('reveal-ready')", landing.text)  # fail-open if site.js is missing
+
+        self.mock("get_session_user", return_value=USER)
+        self.mock("get_user_analytics", return_value=ANALYTICS)
+        self.mock("get_wallet_transactions", return_value=[])
+        self.mock("premium_trial_status", return_value={"remaining": 0, "limit": 0, "used": 0, "pct": 0})
+        self.assertIn("classList.add('console-booting')", self.client.get("/").text)
 
     def test_protected_pages_still_redirect_guests(self):
         self.mock("get_session_user", return_value=None)

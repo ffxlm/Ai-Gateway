@@ -1,3 +1,23 @@
+<script>
+// Pre-paint gate: decide the active view from the URL hash before the panels are
+// parsed so the server-rendered markup never paints every view stacked at once.
+// console.js removes .console-booting after it hydrates; without JS nothing hides.
+(function () {
+    var body = document.body;
+    var kind = body.dataset.consoleKind;
+    if (kind !== 'developer' && kind !== 'admin') return;
+    var views = kind === 'developer'
+        ? ['overview', 'models', 'api', 'usage', 'wallet']
+        : ['overview', 'members', 'ledger', 'reconciliation', 'payments', 'settings'];
+    var aliases = { 'model-library': 'models', credentials: 'api', 'usage-analytics': 'usage', 'wallet-activity': 'wallet' };
+    var hash = location.hash.slice(1);
+    try { hash = decodeURIComponent(hash); } catch (error) { hash = ''; }
+    var view = aliases[hash] || hash || 'overview';
+    if (views.indexOf(view) === -1) view = 'overview';
+    body.dataset.activeView = view;
+    body.classList.add('console-booting');
+})();
+</script>
 <a class="skip-link" href="#console-main">Skip to content</a>
 <button class="console-scrim" type="button" aria-label="Close navigation" hidden></button>
 <aside class="console-sidebar" id="console-sidebar" aria-label="Workspace navigation">

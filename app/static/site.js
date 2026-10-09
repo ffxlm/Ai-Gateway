@@ -10,7 +10,6 @@
             });
         }, { threshold: 0.08 });
         document.querySelectorAll('.reveal').forEach(element => {
-            element.classList.add('will-reveal');
             observer.observe(element);
         });
     }

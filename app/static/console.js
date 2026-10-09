@@ -124,6 +124,7 @@
             const candidate = hashViews[hash] || hash || 'overview';
             const active = Object.hasOwn(views, candidate) ? candidate : 'overview';
             body.dataset.activeView = active;
+            body.classList.remove('console-booting');
             document.querySelectorAll('[data-console-view]').forEach(panel => {
                 panel.hidden = !panel.dataset.consoleView.split(' ').includes(active);
             });
