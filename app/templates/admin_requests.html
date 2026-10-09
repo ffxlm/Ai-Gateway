@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Request Log | AI Gateway Admin</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/portal.css?v=2">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         body {
@@ -33,54 +33,24 @@
             padding: 0;
         }
     </style>
+    <link rel="icon" type="image/svg+xml" href="/static/brand.svg">
+    <link rel="stylesheet" href="/static/design.css?v=2">
+    <link rel="stylesheet" href="/static/console.css?v=3">
+    <script src="/static/console.js?v=3" defer></script>
 </head>
-<body class="text-zinc-100 min-h-screen flex flex-col antialiased">
+<body class="portal-ui console-app text-zinc-100 min-h-screen antialiased" data-console-kind="audit">
 
-    <!-- Top Bar -->
-    <header class="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2">
-            <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
-                <a href="/admin" class="p-1.5 sm:p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-md transition" title="Back to Admin">
-                    <i class="fa-solid fa-arrow-left text-xs"></i>
-                </a>
-                <div class="flex items-center space-x-2">
-                    <i class="fa-solid fa-list-check text-cyan-400 text-sm"></i>
-                    <span class="font-semibold text-xs sm:text-sm tracking-wide uppercase text-zinc-200 whitespace-nowrap">Request<span class="hidden sm:inline"> Audit Log</span></span>
-                </div>
-            </div>
-            <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
-                <span class="text-xs text-zinc-400 font-mono hidden sm:inline">{{ user.username }}</span>
-                <a href="/auth/logout" title="Sign Out" class="p-1.5 sm:p-2 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 rounded-md transition">
-                    <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
-                </a>
-            </div>
-        </div>
-    </header>
+    {% set console_kind = 'audit' %}
+    {% include 'console_shell.html' %}
 
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <main id="console-main">
+        <section class="workspace-heading"><div><span class="eyebrow">OBSERVABILITY</span><h1>Request audit</h1><p>Every request. Every token. A transparent record.</p></div><a class="console-button" href="/admin/requests/export{% if request.url.query %}?{{ request.url.query }}{% endif %}"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i>Export CSV</a></section>
 
         <!-- Summary for current filter -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div class="p-3.5 rounded-xl bg-zinc-900/70 border border-zinc-800 space-y-1">
-                <div class="text-[11px] text-zinc-400 uppercase tracking-wider">Matching Requests</div>
-                <div class="text-lg font-bold font-mono text-zinc-100">{{ "{:,}".format(summary.requests or 0) }}</div>
-            </div>
-            <div class="p-3.5 rounded-xl bg-zinc-900/70 border border-zinc-800 space-y-1">
-                <div class="text-[11px] text-zinc-400 uppercase tracking-wider">Tokens (in / out)</div>
-                <div class="text-sm sm:text-base font-bold font-mono text-zinc-100 truncate">{{ "{:,}".format(summary.tokens_in or 0) }} <span class="text-zinc-500">/</span> {{ "{:,}".format(summary.tokens_out or 0) }}</div>
-            </div>
-            <div class="p-3.5 rounded-xl bg-zinc-900/70 border border-zinc-800 space-y-1">
-                <div class="text-[11px] text-zinc-400 uppercase tracking-wider">Trial (free) Tokens</div>
-                <div class="text-sm sm:text-base font-bold font-mono text-violet-300 truncate">{{ "{:,}".format(summary.trial_tokens or 0) }}</div>
-            </div>
-            <div class="p-3.5 rounded-xl bg-zinc-900/70 border border-zinc-800 space-y-1">
-                <div class="text-[11px] text-zinc-400 uppercase tracking-wider">Charged (USD)</div>
-                <div class="text-sm sm:text-base font-bold font-mono text-amber-300 truncate">${{ summary.cost_usd | usd }} <span class="text-[10px] font-normal text-zinc-500">· ฿{{ summary.cost_usd | thb(usd_to_thb) }}</span>{% if summary.unbilled_usd %} <span class="text-[10px] font-normal text-rose-400">+ ${{ summary.unbilled_usd | usd }} unbilled</span>{% endif %}</div>
-            </div>
-        </div>
+        <section class="console-summary"><div><span class="console-summary-label">Matching requests</span><strong>{{ "{:,}".format(summary.requests or 0) }}</strong><small>For your current filters</small></div><div><span class="console-summary-label">Tokens in / out</span><strong class="metric-small">{{ "{:,}".format(summary.tokens_in or 0) }} / {{ "{:,}".format(summary.tokens_out or 0) }}</strong><small>Input and output consumption</small></div><div><span class="console-summary-label">Free trial tokens</span><strong>{{ "{:,}".format(summary.trial_tokens or 0) }}</strong><small>Covered by daily allowances</small></div><div><span class="console-summary-label">Charged</span><strong>${{ summary.cost_usd | usd }}</strong><small>฿{{ summary.cost_usd | thb(usd_to_thb) }}{% if summary.unbilled_usd %} · ${{ summary.unbilled_usd | usd }} unbilled{% endif %}</small></div></section>
 
         <!-- Filters -->
-        <div class="p-4 sm:p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+        <details class="console-panel audit-filters" open><summary><i class="fa-solid fa-filter" aria-hidden="true"></i>Filter requests <span class="text-xs text-zinc-500">User, model, date, and status</span></summary>
             <form method="GET" action="/admin/requests" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
                 <div class="space-y-1 min-w-0 sm:col-span-2 lg:col-span-1">
                     <label class="text-[11px] font-medium text-zinc-400">User <span class="text-zinc-600">(type to search)</span></label>
@@ -132,10 +102,11 @@
                     </a>
                 </div>
             </form>
-        </div>
+        </details>
+        <nav class="audit-tabs" aria-label="Audit sections"><a href="#request-list" aria-current="page">Request log</a><a href="#trial-history">Trial history <span>↗</span></a></nav>
 
         <!-- Request Log Table -->
-        <div class="rounded-xl bg-zinc-900/60 border border-zinc-800 overflow-hidden">
+        <div id="request-list" class="console-panel console-data-panel">
             <div class="px-4 sm:px-6 py-3 border-b border-zinc-800/80 flex items-center justify-between gap-2">
                 <h2 class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
                     <i class="fa-solid fa-receipt text-zinc-400"></i>
@@ -234,7 +205,7 @@
         </div>
 
         <!-- Trial History -->
-        <div class="rounded-xl bg-zinc-900/60 border border-zinc-800 overflow-hidden">
+        <div id="trial-history" class="console-panel console-data-panel">
             <div class="px-4 sm:px-6 py-3 border-b border-zinc-800/80 flex items-start justify-between gap-3">
                 <div>
                     <h2 class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">

@@ -1,0 +1,9 @@
+{# Shared provider presentation; model IDs remain the authoritative mapping. #}
+{% macro provider_name(model_id, provider) -%}
+{{ 'OpenAI' if 'gpt' in model_id|lower else provider }}
+{%- endmacro %}
+{% macro provider_logo(model_id, provider, class_name) -%}
+{% set model = model_id|lower %}
+{% set icon = 'deepseek' if 'deepseek' in model else 'zhipu' if 'glm' in model else 'minimax' if 'minimax' in model else 'openai' if 'gpt' in model else none %}
+<span class="{{ class_name }}">{% if icon %}<img class="provider-logo" src="/static/providers/{{ icon }}.svg" width="24" height="24" alt="" loading="lazy" decoding="async">{% else %}{{ provider[:1] }}{% endif %}</span>
+{%- endmacro %}

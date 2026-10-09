@@ -1,157 +1,85 @@
+{% from 'provider_identity.html' import provider_logo, provider_name %}
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In | AI Gateway Portal</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <style>
-        body {
-            background-color: #09090b;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        }
-        .grid-bg {
-            background-image:
-                linear-gradient(rgba(99, 102, 241, 0.06) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(99, 102, 241, 0.06) 1px, transparent 1px);
-            background-size: 34px 34px;
-        }
-        .glow {
-            background: radial-gradient(circle at 50% 45%, rgba(99, 102, 241, 0.22), rgba(139, 92, 246, 0.10) 40%, transparent 70%);
-        }
-    </style>
+    <meta name="theme-color" content="#08090b">
+    <meta name="description" content="One API for your AI workflow. Access unlimited free models, premium intelligence, and transparent prepaid billing with AI Gateway.">
+    <title>AI Gateway — A simpler way to build with AI</title>
+    <link rel="icon" type="image/svg+xml" href="/static/brand.svg">
+    <link rel="stylesheet" href="/static/design.css?v=3">
+    <link rel="stylesheet" href="/static/product-preview.css?v=3">
+    <script src="/static/site.js?v=2" defer></script>
 </head>
-<body class="text-zinc-100 min-h-screen flex items-center justify-center p-4 sm:p-6 antialiased selection:bg-indigo-500 selection:text-white">
-
-    <!-- Two-column shell: form on the left, product story on the right -->
-    <div class="w-full max-w-5xl rounded-2xl bg-zinc-900/60 border border-zinc-800/80 shadow-2xl backdrop-blur-xs overflow-hidden grid md:grid-cols-2">
-
-        <!-- ─── LEFT: Sign-in ─── -->
-        <div class="p-6 sm:p-8 lg:p-10 flex flex-col md:min-h-[560px]">
-
-            <!-- Brand -->
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2.5">
-                    <div class="h-9 w-9 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-center text-zinc-200 shadow-xs">
-                        <i class="fa-solid fa-microchip text-sm"></i>
-                    </div>
-                    <span class="font-semibold text-sm tracking-wide text-zinc-100">AI Gateway</span>
-                </div>
-                <div class="hidden sm:flex items-center space-x-2 text-[11px] text-zinc-500">
-                    <span class="flex h-2 w-2 relative">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span>All systems operational</span>
-                </div>
+<body class="landing">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+        <nav class="site-nav container" aria-label="Main navigation">
+            <a class="brand" href="/login" aria-label="AI Gateway home"><img src="/static/brand.svg" width="27" height="27" alt=""><span>AI Gateway</span></a>
+            <div class="nav-links"><a href="#platform">Platform</a><a href="#models">Models</a><a href="#developers">Developers</a></div>
+            <div class="nav-actions"><a class="nav-support" href="{{ discord_invite }}" target="_blank" rel="noopener noreferrer">Support <span aria-hidden="true">↗</span></a><a class="button button-small button-light" href="/auth/discord/login">Sign in <span aria-hidden="true">↗</span></a></div>
+        </nav>
+    </header>
+    <main id="main">
+        <section class="hero container">
+            <a class="announcement" href="#models"><span class="announcement-dot"></span>Built for your next idea<span class="announcement-separator"></span>Explore the models <span aria-hidden="true">→</span></a>
+            <h1>Intelligence, connected.<br><span>Everything else, simplified.</span></h1>
+            <div class="hero-bottom"><p>One API for the models you love. Less infrastructure,<br class="desktop-break"> more room to build something extraordinary.</p><div class="hero-cta"><a class="button button-light" href="/auth/discord/login">Start building <span aria-hidden="true">→</span></a><a class="text-link" href="#developers">Explore the API <span aria-hidden="true">↗</span></a></div></div>
+            {% if error %}<div class="auth-error" role="alert"><span aria-hidden="true">!</span><div>{{ error }} <a href="/auth/discord/login">Try signing in again →</a></div></div>{% endif %}
+            {% include 'product_preview.html' %}
+            <div class="integration-strip"><p>Fits right into the way you build.</p><div><span class="integration-brand">⌘ <b>Cursor</b></span><span class="integration-brand cline-brand">▣ <b>Cline</b></span><span class="integration-brand">◈ <b>OpenAI SDK</b></span><span class="integration-brand">↗ <b>NextChat</b></span><span class="integration-brand">▱ <b>LibreChat</b></span></div></div>
+        </section>
+        <section class="platform-section container" id="platform">
+            <div class="section-heading reveal"><span class="eyebrow">LESS FRICTION. MORE FOCUS.</span><h2>Your ideas deserve<br>better infrastructure.</h2><p>From your first request to your next release.<br>Everything you need, without the extra complexity.</p></div>
+            <div class="feature-grid">
+                <article class="feature-card reveal"><div class="feature-art orbit-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit-core"><img src="/static/brand.svg" width="36" height="36" alt=""></div>{{ provider_logo('deepseek', 'DeepSeek', 'orbit-node node-one') }}{{ provider_logo('minimax', 'MiniMax', 'orbit-node node-two') }}{{ provider_logo('glm', 'ZHIPU AI', 'orbit-node node-three') }}</div><span class="feature-number">01 / CONNECT</span><h3>One endpoint. Zero detours.</h3><p>Connect your favorite tools to a single OpenAI-compatible API. Switch models, not your workflow.</p></article>
+                <article class="feature-card reveal"><div class="feature-art stream-art" aria-hidden="true"><div class="stream-row"><span>Request</span><i></i><i></i><i></i><b>→</b></div><div class="stream-row"><span>Response</span><i></i><i></i><i></i><b>→</b></div><div class="stream-caption"><span class="tiny-dot"></span> Server-sent events</div></div><span class="feature-number">02 / BUILD</span><h3>Built to keep you moving.</h3><p>Real-time streaming and non-blocking requests. Responses flow directly into the experience you're building.</p></article>
+                <article class="feature-card reveal"><div class="feature-art wallet-art" aria-hidden="true"><div class="wallet-mini"><span>YOUR WALLET <span>↗</span></span><strong>USD <small>← THB</small></strong><div><span>Prepaid balance</span><b>You're in control</b></div></div></div><span class="feature-number">03 / SCALE</span><h3>Clear costs. No surprises.</h3><p>Unlimited free models. Token-based premium billing. Top up in Thai Baht and track every charge in USD.</p></article>
             </div>
-
-            <!-- Form (vertically centered) -->
-            <div class="flex-1 flex flex-col justify-center py-6 sm:py-8">
-                <div class="space-y-1.5">
-                    <h1 class="text-2xl font-bold tracking-tight text-zinc-100">Welcome!</h1>
-                    <p class="text-sm text-zinc-400">Sign in to access your models, wallet, and API keys.</p>
-                </div>
-
-                {% if error %}
-                <div class="mt-6 p-3 rounded-lg bg-rose-950/40 border border-rose-900/60 text-rose-300 text-xs flex items-center space-x-2.5">
-                    <i class="fa-solid fa-circle-exclamation text-rose-400 shrink-0"></i>
-                    <span>{{ error }}</span>
-                </div>
-                {% endif %}
-
-                <!-- Primary Action: Discord OAuth -->
-                <div class="mt-6 space-y-2.5">
-                    <a href="/auth/discord/login" class="w-full py-3 px-4 bg-[#5865F2] hover:bg-[#4752c4] text-white font-semibold text-sm rounded-lg transition flex items-center justify-center space-x-2.5 shadow-lg shadow-indigo-950/40 active:scale-[0.99]">
-                        <i class="fa-brands fa-discord text-lg"></i>
-                        <span>Continue with Discord</span>
-                    </a>
-                    <p class="text-center text-[11px] text-zinc-500">
-                        Can't sign in? <a href="{{ discord_invite }}" target="_blank" rel="noopener" class="text-indigo-400 hover:text-indigo-300 font-medium">Contact support</a>
-                    </p>
-                </div>
-
-                <!-- Feature list -->
-                <div class="mt-8 space-y-3 text-[13px] leading-relaxed text-zinc-400 md:text-xs md:leading-normal">
-                    <div class="flex items-start space-x-2.5">
-                        <i class="fa-solid fa-infinity text-emerald-400 text-xs shrink-0 mt-0.5"></i>
-                        <span><span class="text-zinc-200 font-medium">{{ free_models|length }} free models</span> with unlimited usage — no daily cap</span>
-                    </div>
-                    <div class="flex items-start space-x-2.5">
-                        <i class="fa-solid fa-crown text-violet-400 text-xs shrink-0 mt-0.5"></i>
-                        <span><span class="text-zinc-200 font-medium">Premium xHigh models</span> with a daily free trial, then pay-as-you-go</span>
-                    </div>
-                    <div class="flex items-start space-x-2.5">
-                        <i class="fa-solid fa-wallet text-emerald-400 text-xs shrink-0 mt-0.5"></i>
-                        <span>Top up in Thai Baht (฿{{ usd_to_thb | int }} = $1) into a prepaid USD wallet</span>
-                    </div>
-                </div>
+        </section>
+        <section class="models-section container" id="models">
+            <div class="section-heading reveal"><span class="eyebrow">THE RIGHT MODEL FOR THE MOMENT</span><h2>More intelligence.<br>Fewer compromises.</h2><p>Start with unlimited free models.<br>Reach for premium when your work calls for more.</p></div>
+            <div class="model-table reveal"><div class="model-table-head"><span>Model / Provider</span><span>Access</span><span>Input / Output per 1M tokens</span></div>
+                {% for model in free_models %}{% set provider = 'DeepSeek' if 'deepseek' in model|lower else 'ZHIPU AI' if 'glm' in model|lower else 'MiniMax' %}<div class="model-table-row"><div class="model-table-name">{{ provider_logo(model, provider, 'model-glyph') }}<div><h3>{{ model }}</h3><span>{{ provider }}</span></div></div><span class="model-tag">Unlimited free</span><span class="model-price">$0.00 <small>Always free</small></span></div>{% endfor %}
+                {% for model in premium_models %}<div class="model-table-row"><div class="model-table-name">{{ provider_logo(model.id, model.provider, 'model-glyph premium-glyph') }}<div><h3>{{ model.id }}</h3><span>{{ provider_name(model.id, model.provider) }}</span></div></div><span class="model-tag premium-tag">Premium</span><span class="model-price">${{ model.price_in_usd }} / ${{ model.price_out_usd }}<small>Pay per token</small></span></div>{% endfor %}
             </div>
+        </section>
+        <section class="developer-section container" id="developers">
+            <div class="developer-copy reveal"><span class="eyebrow">MADE FOR DEVELOPERS</span><h2>Feels familiar.<br>Works beautifully.</h2><p>No new SDK to learn. No workflow to rebuild.<br>Set your base URL, add your key, and make your first request.</p><ul class="developer-checks"><li><span>✓</span> OpenAI-compatible chat completions</li><li><span>✓</span> Real-time streaming support</li><li><span>✓</span> Usage analytics and per-request metering</li></ul><a class="text-link" href="/auth/discord/login">Get your API key <span aria-hidden="true">→</span></a></div>
+            <div class="developer-code reveal"><div class="code-toolbar"><div role="tablist" aria-label="Code examples"><button id="python-tab" role="tab" aria-selected="true" aria-controls="python-example" data-code-tab="python">Python</button><button id="curl-tab" role="tab" aria-selected="false" aria-controls="curl-example" data-code-tab="curl" tabindex="-1">cURL</button></div><button class="copy-code" data-copy-code>Copy <span aria-hidden="true">⧉</span></button></div>
+                <pre id="python-example" role="tabpanel" aria-labelledby="python-tab" tabindex="0"><code><span class="syntax-purple">from</span> openai <span class="syntax-purple">import</span> OpenAI
 
-            <!-- Terms -->
-            <div class="border-t border-zinc-800/60 pt-4 text-center text-[11px] text-zinc-600">
-                By signing in, you agree to our Terms of Service &amp; acceptable use policies.
-            </div>
-        </div>
-
-        <!-- ─── RIGHT: Product story (desktop only) ─── -->
-        <div class="relative hidden md:flex flex-col justify-center p-8 lg:p-10 bg-zinc-950 border-l border-zinc-800/80 overflow-hidden">
-            <div class="absolute inset-0 grid-bg opacity-70"></div>
-            <div class="absolute inset-0 glow"></div>
-
-            <div class="relative space-y-6">
-                <span class="inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[11px] font-medium text-violet-300 w-fit">
-                    <i class="fa-solid fa-bolt text-[10px]"></i>Fast &amp; Stable
-                </span>
-
-                <h2 class="text-3xl font-bold leading-tight tracking-tight text-zinc-100">
-                    One endpoint.<br>
-                    <span class="text-zinc-400">Every model you need.</span>
-                </h2>
-
-                <p class="text-sm text-zinc-400 leading-relaxed">
-                    Drop-in compatible with the [OI] API. Point your existing tools at our base URL and start building in seconds.
-                </p>
-
-                <!-- Code sample -->
-                <div class="rounded-xl border border-zinc-800 bg-zinc-900/80 backdrop-blur-xs overflow-hidden shadow-xl">
-                    <div class="flex items-center space-x-1.5 px-3.5 py-2.5 border-b border-zinc-800/80">
-                        <span class="h-2.5 w-2.5 rounded-full bg-rose-500/70"></span>
-                        <span class="h-2.5 w-2.5 rounded-full bg-amber-500/70"></span>
-                        <span class="h-2.5 w-2.5 rounded-full bg-emerald-500/70"></span>
-                        <span class="ml-2 text-[11px] text-zinc-500 font-mono">quickstart.py</span>
-                    </div>
-                    <pre class="p-4 text-[11px] leading-relaxed font-mono text-zinc-300 overflow-x-auto"><span class="text-fuchsia-400">from</span> openai <span class="text-fuchsia-400">import</span> <span class="text-sky-300">[OI]</span>
-
-client = <span class="text-sky-300">[OI]</span>(
-    base_url=<span class="text-amber-300">"{{ api_endpoint }}"</span>,
-    api_key=<span class="text-amber-300">"sk-portal-..."</span>,
+client = OpenAI(
+    base_url=<span class="syntax-green">"{{ api_endpoint }}"</span>,
+    api_key=<span class="syntax-green">"YOUR_API_KEY"</span>,
 )
 
-resp = client.chat.completions.create(
-    model=<span class="text-amber-300">"deepseek-v4-flash"</span>,
-    messages=[{<span class="text-amber-300">"role"</span>: <span class="text-amber-300">"user"</span>, <span class="text-amber-300">"content"</span>: <span class="text-amber-300">"Hi"</span>}],
+response = client.chat.completions.create(
+    model=<span class="syntax-green">"{{ free_models[0] }}"</span>,
+    messages=[{
+        <span class="syntax-green">"role"</span>: <span class="syntax-green">"user"</span>,
+        <span class="syntax-green">"content"</span>: <span class="syntax-green">"Let's build something great."</span>
+    }],
 )
-<span class="text-sky-300">print</span>(resp.choices[<span class="text-emerald-400">0</span>].message.content)</pre>
-                </div>
 
-                <!-- Stat chips -->
-                <div class="flex flex-wrap gap-2 pt-1">
-                    <span class="inline-flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/70 px-2.5 py-1.5 text-[11px] text-zinc-300">
-                        <i class="fa-solid fa-infinity text-emerald-400 text-[10px]"></i>Unlimited free tier
-                    </span>
-                    <span class="inline-flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/70 px-2.5 py-1.5 text-[11px] text-zinc-300">
-                        <i class="fa-solid fa-bolt text-sky-400 text-[10px]"></i>High concurrency
-                    </span>
-                    <span class="inline-flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/70 px-2.5 py-1.5 text-[11px] text-zinc-300">
-                        <i class="fa-solid fa-shield-halved text-violet-400 text-[10px]"></i>Per-request metering
-                    </span>
-                </div>
+<span class="syntax-purple">print</span>(response.choices[0].message.content)</code></pre>
+                <pre id="curl-example" role="tabpanel" aria-labelledby="curl-tab" tabindex="0" hidden><code>curl {{ api_endpoint }}/chat/completions \
+  -H <span class="syntax-green">"Authorization: Bearer YOUR_API_KEY"</span> \
+  -H <span class="syntax-green">"Content-Type: application/json"</span> \
+  -d <span class="syntax-green">'{
+    "model": "{{ free_models[0] }}",
+    "messages": [{
+      "role": "user",
+      "content": "Let’s build something great."
+    }]
+  }'</span></code></pre>
+                <div class="developer-code-footer"><span>POST</span> /v1/chat/completions<span>OpenAI compatible</span></div>
+                <span id="copy-status" class="sr-only" role="status" aria-live="polite"></span>
             </div>
-        </div>
-
-    </div>
-
+        </section>
+        <section class="closing-section container reveal"><div><span class="eyebrow">YOUR NEXT CHAPTER STARTS HERE</span><h2>Less setup.<br>More extraordinary.</h2></div><div><a class="button button-light" href="/auth/discord/login">Continue with Discord <span aria-hidden="true">↗</span></a><p>Free models. No credit card required.</p></div></section>
+    </main>
+    <footer class="site-footer container"><a class="brand" href="/login"><img src="/static/brand.svg" width="24" height="24" alt="">AI Gateway</a><span>Built for what comes next.</span><a href="{{ discord_invite }}" target="_blank" rel="noopener noreferrer">Join the community <span aria-hidden="true">↗</span></a><small>© 2026 AI Gateway</small></footer>
 </body>
 </html>

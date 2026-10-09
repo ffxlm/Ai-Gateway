@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard | AI Gateway</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/portal.css?v=2">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         body { 
@@ -13,101 +13,38 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
     </style>
+    <link rel="icon" type="image/svg+xml" href="/static/brand.svg">
+    <link rel="stylesheet" href="/static/design.css?v=2">
+    <link rel="stylesheet" href="/static/console.css?v=3">
+    <script src="/static/console.js?v=3" defer></script>
 </head>
-<body class="text-zinc-100 min-h-screen flex flex-col antialiased">
+<body class="portal-ui console-app text-zinc-100 min-h-screen antialiased" data-console-kind="admin">
 
-    <!-- Top Bar -->
-    <header class="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2">
-            <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
-                <a href="/" class="p-1.5 sm:p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-md transition" title="Back to Portal">
-                    <i class="fa-solid fa-arrow-left text-xs"></i>
-                </a>
-                <div class="flex items-center space-x-2">
-                    <i class="fa-solid fa-shield-halved text-indigo-400 text-sm"></i>
-                    <span class="font-semibold text-xs sm:text-sm tracking-wide uppercase text-zinc-200 whitespace-nowrap">Admin<span class="hidden sm:inline"> Control Center</span></span>
-                </div>
-            </div>
-            <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
-                <a href="/admin/requests" class="px-2.5 sm:px-3 py-1.5 rounded-md bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-[11px] sm:text-xs font-medium transition flex items-center space-x-1.5" title="Per-request audit log">
-                    <i class="fa-solid fa-list-check text-[10px] text-cyan-400"></i>
-                    <span class="hidden sm:inline">Request Log</span>
-                </a>
-                <span class="text-xs text-zinc-400 font-mono"><span class="hidden sm:inline">Logged in as: </span><strong class="text-zinc-200">{{ user.username }}</strong></span>
-                <a href="/auth/logout" title="Sign Out" class="p-1.5 sm:p-2 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 rounded-md transition">
-                    <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
-                </a>
-            </div>
-        </div>
-    </header>
+    {% set console_kind = 'admin' %}
+    {% include 'console_shell.html' %}
+    {% include 'console_dialog.html' %}
 
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <main id="console-main">
+        <section class="workspace-heading"><div><span class="eyebrow">ADMIN WORKSPACE</span><h1 data-console-title>Overview</h1><p data-console-description>Your platform at a glance. Everything in its place.</p></div><a class="console-button" href="/admin/requests">Explore request audit <span aria-hidden="true">↗</span></a></section>
 
         <!-- Stats Overview -->
-        <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-indigo-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    <span class="truncate font-medium">Total Users</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-users text-xs sm:text-sm"></i>
-                    </div>
-                </div>
-                <div class="text-lg sm:text-2xl font-bold font-mono text-zinc-100">{{ stats.total_users }}</div>
-            </div>
+        <div data-console-view="overview" class="console-summary admin-summary">
+            <div><span class="console-summary-label">Total members</span><strong>{{ stats.total_users }}</strong><small>Registered accounts</small></div>
 
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-emerald-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    <span class="truncate font-medium">Wallet Liability</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-wallet text-xs sm:text-sm"></i>
-                    </div>
-                </div>
-                <div class="text-base sm:text-2xl font-bold font-mono text-emerald-400 truncate">${{ stats.total_balance | usd }}</div>
-            </div>
+            <div><span class="console-summary-label">Wallet liability</span><strong>${{ stats.total_balance | usd }}</strong><small>Held customer balances</small></div>
 
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-amber-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    <span class="truncate font-medium">Premium Revenue</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-crown text-xs sm:text-sm"></i>
-                    </div>
-                </div>
-                <div class="text-base sm:text-2xl font-bold font-mono text-amber-300 truncate">${{ stats.total_spent | usd }}</div>
-            </div>
+            <div><span class="console-summary-label">Premium revenue</span><strong>${{ stats.total_spent | usd }}</strong><small>Lifetime settled usage</small></div>
 
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-sky-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    <span class="truncate font-medium">Tokens Today</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-chart-line text-xs sm:text-sm"></i>
-                    </div>
-                </div>
-                <div class="text-base sm:text-2xl font-bold font-mono text-zinc-100 truncate">{{ "{:,}".format(stats.total_tokens_today) }}</div>
-            </div>
+            <div><span class="console-summary-label">Tokens today</span><strong>{{ "{:,}".format(stats.total_tokens_today) }}</strong><small>Across all models</small></div>
 
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-emerald-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    <span class="truncate font-medium">Requests Today</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-bolt text-xs sm:text-sm"></i>
-                    </div>
-                </div>
-                <div class="text-lg sm:text-2xl font-bold font-mono text-emerald-400">{{ "{:,}".format(stats.requests_today) }}</div>
-            </div>
+            <div><span class="console-summary-label">Requests today</span><strong>{{ "{:,}".format(stats.requests_today) }}</strong><small>Platform-wide traffic</small></div>
 
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-violet-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    <span class="truncate font-medium">All-Time Tokens</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-database text-xs sm:text-sm"></i>
-                    </div>
-                </div>
-                <div class="text-base sm:text-2xl font-bold font-mono text-violet-300 truncate">{{ "{:,}".format(stats.all_time_tokens) }}</div>
-            </div>
+            <div><span class="console-summary-label">All-time tokens</span><strong>{{ "{:,}".format(stats.all_time_tokens) }}</strong><small>Lifetime consumption</small></div>
         </div>
+        <aside class="console-overview-aside" data-console-view="overview"><div class="console-aside-card"><span class="eyebrow">EVERY REQUEST. EVERY TOKEN.</span><h2>Clarity at<br>every level.</h2><p>Trace model usage, trial allowances, and wallet charges in one transparent request log.</p><a class="console-button" href="/admin/requests">Open request audit <span aria-hidden="true">↗</span></a></div><div class="console-aside-list"><h2>Platform controls</h2><a href="#members"><i class="fa-solid fa-users" aria-hidden="true"></i>Manage members<span>→</span></a><a href="#reconciliation"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>Reconcile balances<span>→</span></a><a href="#settings"><i class="fa-solid fa-sliders" aria-hidden="true"></i>Configure your gateway<span>→</span></a></div></aside>
 
         <!-- Section: Platform Usage Analytics -->
-        <div class="p-4 sm:p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4 sm:space-y-5">
+        <div data-console-view="overview" class="console-panel console-analytics space-y-4">
             <div class="flex items-center justify-between gap-3 border-b border-zinc-800/80 pb-3 sm:pb-4">
                 <div>
                     <h2 class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
@@ -153,15 +90,16 @@
         </div>
 
         <!-- Section: System Configuration -->
-        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-6">
+        <div id="settings" data-console-view="settings" class="console-panel console-settings space-y-6">
             <div class="border-b border-zinc-800/80 pb-4">
                 <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
                     <i class="fa-solid fa-sliders text-zinc-400"></i>
-                    <span>Live Gateway Settings</span>
+                    <span>Gateway configuration</span>
                 </h2>
                 <p class="text-xs text-zinc-400 mt-1">Changes take effect immediately without restarting the server.</p>
             </div>
 
+            <div class="console-settings-intro"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>These settings control live traffic and billing. Review rate and provider changes carefully before saving.</span></div>
             <form action="/api/admin/settings" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1">
                     <label class="text-xs font-medium text-zinc-400">USD → THB Rate (1 USD = ? THB)</label>
@@ -260,17 +198,18 @@
         </div>
 
         <!-- Section: User Management -->
-        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-6">
+        <div id="members" data-console-view="members" class="console-panel console-data-panel">
             <div class="flex items-center justify-between border-b border-zinc-800/80 pb-4">
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
                         <i class="fa-solid fa-users-gear text-zinc-400"></i>
-                        <span>User Accounts & Wallets</span>
+                        <span>Workspace members <small id="member-result-count" role="status">{{ users|length }} members</small></span>
                     </h2>
-                    <p class="text-xs text-zinc-400 mt-1">Adjust balances, reset usage, and control access.</p>
+                    <p class="text-xs text-zinc-400 mt-1">Account details, wallet balances, and access controls.</p>
                 </div>
             </div>
 
+            <div class="member-search-bar console-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="member-search" type="search" placeholder="Search members…" aria-label="Search members by name or ID"></div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs">
                     <thead class="text-zinc-500 uppercase tracking-wider border-b border-zinc-800 font-mono text-[11px]">
@@ -286,7 +225,7 @@
                     </thead>
                     <tbody class="divide-y divide-zinc-800/60">
                         {% for u in users %}
-                        <tr class="hover:bg-zinc-800/30 transition">
+                        <tr data-member-search="{{ u.username }} {{ u.id }}" class="hover:bg-zinc-800/30 transition">
                             <td class="py-3 px-3">
                                 <div class="flex items-center space-x-2.5">
                                     <img src="{{ u.avatar_url }}" alt="avatar" class="h-6 w-6 rounded-full border border-zinc-700">
@@ -308,21 +247,22 @@
                                 {% endif %}
                             </td>
                             <td class="py-3 px-3 text-right space-x-1.5 whitespace-nowrap">
-                                <button onclick="adjustBalance('{{ u.id }}', '{{ u.username }}')" class="px-2 py-1 rounded bg-emerald-900/30 hover:bg-emerald-800/50 text-emerald-300 border border-emerald-800 text-[11px] transition" title="Add or subtract USD balance">Adjust $</button>
+                                <button onclick='adjustBalance({{ u.id | tojson }}, {{ u.username | tojson }})' class="px-2 py-1 rounded bg-emerald-900/30 hover:bg-emerald-800/50 text-emerald-300 border border-emerald-800 text-[11px] transition" title="Add or subtract USD balance">Adjust $</button>
                                 <button onclick="toggleBan('{{ u.id }}')" class="px-2 py-1 rounded {% if u.is_banned %}bg-emerald-900/30 text-emerald-300 border-emerald-800{% else %}bg-rose-900/30 text-rose-300 border-rose-800{% endif %} border text-[11px] transition">
                                     {% if u.is_banned %}Unban{% else %}Ban{% endif %}
                                 </button>
-                                <button onclick="deleteUser('{{ u.id }}', '{{ u.username }}')" class="px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 text-rose-400 hover:text-rose-200 border border-rose-800 text-[11px] transition" title="Delete User"><i class="fa-solid fa-trash"></i></button>
+                                <button onclick='deleteUser({{ u.id | tojson }}, {{ u.username | tojson }})' class="px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 text-rose-400 hover:text-rose-200 border border-rose-800 text-[11px] transition" title="Delete User" aria-label="Delete {{ u.username }}"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
                             </td>
                         </tr>
-                        {% endfor %}
+                        {% else %}<tr><td colspan="7"><div class="console-empty-state"><i class="fa-solid fa-users" aria-hidden="true"></i><strong>Your community starts here.</strong>Registered members will appear in this workspace.</div></td></tr>{% endfor %}
+                        <tr id="member-search-empty" hidden><td colspan="7" class="console-empty-state">No members match your search.</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
         <!-- Section: Wallet Ledger -->
-        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+        <div id="ledger" data-console-view="ledger" class="console-panel console-data-panel">
             <div class="flex items-center justify-between border-b border-zinc-800/80 pb-4">
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
@@ -375,7 +315,7 @@
         </div>
 
         <!-- Section: Wallet Reconciliation -->
-        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+        <div id="reconciliation" data-console-view="reconciliation" class="console-panel console-data-panel">
             <div class="flex items-center justify-between border-b border-zinc-800/80 pb-4">
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
@@ -434,7 +374,7 @@
         </div>
 
         <!-- Section: Recent Top-up Transactions -->
-        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+        <div id="payments" data-console-view="payments" class="console-panel console-data-panel">
             <div class="flex items-center justify-between border-b border-zinc-800/80 pb-4">
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
@@ -492,32 +432,24 @@
 
     <script>
         async function adjustBalance(userId, username) {
-            const input = prompt(`Adjust wallet balance for "${username}" in USD.\nPositive = credit, negative = debit (e.g. 5 or -2.5):`);
-            if (input === null) return;
-            const amount = parseFloat(input);
-            if (!amount || isNaN(amount)) { alert('Please enter a non-zero number.'); return; }
-            const note = prompt('Note (optional):', '') || '';
-            const res = await fetch('/api/admin/adjust-balance', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId, amount_usd: amount, note: note })
-            });
-            const data = await res.json();
-            if (res.ok && data.status === 'ok') {
+            const result = await consoleActionDialog({ title: 'Adjust wallet balance', description: `Update the USD balance for ${username}. Use a positive amount to credit, or a negative amount to debit.`, fields: true, confirm: 'Apply adjustment' });
+            if (!result) return;
+            try {
+                const res = await fetch('/api/admin/adjust-balance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId, amount_usd: result.amount, note: result.note }) });
+                const data = await res.json();
+                if (!res.ok || data.status !== 'ok') throw new Error(data.message || 'Adjustment failed.');
                 window.location.reload();
-            } else {
-                alert(data.message || 'Adjustment failed.');
-            }
+            } catch (error) { consoleNotify(error.message); }
         }
 
         async function deleteUser(userId, username) {
-            if (!confirm(`Permanently delete user "${username}" (ID: ${userId})? This will delete all their keys, history and wallet.`)) return;
-            const res = await fetch('/api/admin/delete-user', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId })
-            });
-            if (res.ok) window.location.reload();
+            const result = await consoleActionDialog({ title: 'Delete this member?', description: `Permanently delete ${username} (${userId}), including their keys, history, and wallet. This cannot be undone.`, confirm: 'Delete member', danger: true });
+            if (!result) return;
+            try {
+                const res = await fetch('/api/admin/delete-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }) });
+                if (!res.ok) throw new Error('Could not delete this member. Please try again.');
+                window.location.reload();
+            } catch (error) { consoleNotify(error.message); }
         }
 
         async function toggleBan(userId) {
@@ -539,8 +471,8 @@
             if (platformChartInstance) platformChartInstance.destroy();
             const ctx = canvas.getContext('2d');
             const gradient = ctx.createLinearGradient(0, 0, 0, 180);
-            gradient.addColorStop(0, 'rgba(34, 211, 238, 0.9)');
-            gradient.addColorStop(1, 'rgba(8, 145, 178, 0.65)');
+            gradient.addColorStop(0, 'rgba(175, 157, 216, 0.95)');
+            gradient.addColorStop(1, 'rgba(103, 88, 138, 0.40)');
             platformChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -549,7 +481,7 @@
                         label: 'Tokens Used',
                         data: data.tokens,
                         backgroundColor: gradient,
-                        hoverBackgroundColor: '#38bdf8',
+                        hoverBackgroundColor: '#cab4ed',
                         borderRadius: 4,
                         borderSkipped: false,
                         maxBarThickness: data.labels.length > 20 ? 10 : 26
@@ -558,6 +490,7 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? false : { duration: 250 },
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
                         legend: { display: false },

@@ -1,3 +1,4 @@
+{% from 'provider_identity.html' import provider_logo, provider_name %}
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -5,185 +6,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Developer Portal | AI Gateway</title>
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/portal.css?v=2">
     <!-- Font Awesome 6 Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#f4f4f5',
-                            500: '#18181b',
-                            600: '#09090b',
-                            accent: '#6366f1'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
     <style>
         body { 
             background-color: #09090b; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
     </style>
+    <link rel="icon" type="image/svg+xml" href="/static/brand.svg">
+    <link rel="stylesheet" href="/static/design.css?v=3">
+    <link rel="stylesheet" href="/static/console.css?v=3">
+    <script src="/static/console.js?v=3" defer></script>
 </head>
-<body class="text-zinc-100 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+<body class="portal-ui console-app text-zinc-100 min-h-screen antialiased" data-console-kind="developer">
 
-    <!-- Top Navigation Bar -->
-    <header class="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2">
-            <!-- Brand Logo -->
-            <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
-                <div class="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-200 shrink-0 shadow-xs">
-                    <i class="fa-solid fa-microchip text-xs sm:text-sm"></i>
-                </div>
-                <span class="font-semibold text-xs sm:text-sm tracking-wide uppercase text-zinc-200 whitespace-nowrap">Gateway Portal</span>
-                <div class="hidden md:flex items-center space-x-2 border-l border-zinc-800 pl-3 ml-1">
-                    <span class="flex h-2 w-2 relative">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span class="text-xs text-zinc-400 font-medium whitespace-nowrap">All Systems Operational</span>
-                </div>
-            </div>
-
-            <!-- User Menu & Actions -->
-            <div class="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
-                {% if effective_role == 'admin' %}
-                <!-- Admin Controls -->
-                <div class="inline-flex items-center rounded-lg bg-zinc-900/90 border border-zinc-800 p-0.5 shadow-xs">
-                    <a href="/admin" class="px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md text-zinc-200 hover:text-white hover:bg-zinc-800 transition flex items-center space-x-1.5 whitespace-nowrap" title="Admin Control Panel">
-                        <i class="fa-solid fa-shield-halved text-indigo-400 text-xs"></i>
-                        <span>Admin<span class="hidden sm:inline"> Panel</span></span>
-                    </a>
-                    {% if is_admin %}
-                    <span class="w-[1px] h-3.5 bg-zinc-800 mx-0.5"></span>
-                    <a href="/?view=user" class="px-2 py-1 text-xs font-medium rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition flex items-center space-x-1 whitespace-nowrap" title="Switch to User View">
-                        <i class="fa-solid fa-eye text-xs"></i>
-                        <span class="hidden sm:inline">User View</span>
-                    </a>
-                    {% endif %}
-                </div>
-                {% else %}
-                <!-- Regular User: Top Up -->
-                <div class="inline-flex items-center space-x-1.5">
-                    <button onclick="openTopupModal()" class="px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-medium rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition flex items-center space-x-1.5 shadow-xs group whitespace-nowrap" title="Top up your wallet">
-                        <i class="fa-solid fa-wallet text-emerald-400 group-hover:scale-110 transition-transform text-xs"></i>
-                        <span>Top Up</span>
-                    </button>
-                    {% if is_admin %}
-                    <a href="/?view=admin" class="px-2 sm:px-2.5 py-1 sm:py-1.5 text-xs font-medium rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition flex items-center space-x-1 whitespace-nowrap shadow-xs" title="Switch back to Admin View">
-                        <i class="fa-solid fa-arrow-right-arrow-left text-xs"></i>
-                        <span class="hidden sm:inline">Admin View</span>
-                    </a>
-                    {% endif %}
-                </div>
-                {% endif %}
-
-                <!-- Profile & Signout -->
-                <div class="flex items-center space-x-1.5 sm:space-x-2 pl-1.5 border-l border-zinc-800/80">
-                    <img src="{{ user.avatar_url }}" alt="Avatar" class="h-7 w-7 sm:h-8 sm:w-8 rounded-full border border-zinc-700/80 shrink-0">
-                    <div class="hidden md:block text-left">
-                        <div class="text-xs font-semibold text-zinc-200 leading-tight truncate max-w-[120px]">{{ user.username }}</div>
-                        <div class="text-[10px] text-zinc-500 uppercase tracking-wider font-mono whitespace-nowrap">
-                            <span class="text-emerald-400 font-semibold">${{ balance | usd }}</span>
-                            <span class="text-zinc-600">·</span>
-                            <span class="text-zinc-400">฿{{ balance | thb(usd_to_thb) }}</span>
-                        </div>
-                    </div>
-                    <a href="/auth/logout" title="Sign Out" class="p-1.5 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/80 rounded-md transition shrink-0">
-                        <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </header>
+    {% set console_kind = 'developer' %}
+    {% include 'console_shell.html' %}
+    {% include 'console_dialog.html' %}
 
     <!-- Main Content Container -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <main id="console-main">
+        <section class="workspace-heading">
+            <div><span class="eyebrow">YOUR DEVELOPER WORKSPACE</span><h1 data-console-title>Overview</h1><p data-console-description>A clear view of everything you’re building.</p></div>
+            <span class="heading-meta"><i class="fa-solid fa-code" aria-hidden="true"></i> OpenAI-compatible API</span>
+        </section>
 
-        <!-- Top Metrics Grid -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-
-            <!-- Metric 1: Wallet Balance -->
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-emerald-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    <span class="truncate font-medium">Wallet Balance</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-wallet text-xs sm:text-sm"></i>
-                    </div>
-                </div>
-                <div class="min-w-0">
-                    <div class="text-base sm:text-2xl font-bold tracking-tight text-emerald-400 font-mono truncate">${{ balance | usd }}</div>
-                    <div class="text-[11px] sm:text-sm font-semibold text-emerald-300/80 font-mono truncate">≈ ฿{{ balance | thb(usd_to_thb) }}</div>
-                </div>
-                <button onclick="openTopupModal()" class="text-[10px] sm:text-[11px] text-emerald-400/90 hover:text-emerald-300 flex items-center space-x-1 font-medium transition">
-                    <i class="fa-solid fa-plus text-[9px]"></i>
-                    <span>Top up · 1 USD = ฿{{ usd_to_thb | int }}</span>
-                </button>
-            </div>
-
-            <!-- Metric 2: Free Models -->
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-indigo-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs text-indigo-300/80">
-                    <span class="truncate font-medium">Free Models</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-infinity text-xs sm:text-sm"></i>
-                    </div>
-                </div>
-                <div class="text-base sm:text-2xl font-bold tracking-tight text-indigo-400 font-mono">UNLIMITED</div>
-                <div class="text-[10px] sm:text-[11px] text-zinc-500 flex items-center space-x-1">
-                    <i class="fa-solid fa-bolt text-[9px] text-indigo-400"></i>
-                    <span>{{ models|length }} models · never charged</span>
-                </div>
-            </div>
-
-            <!-- Metric 3: Total Spent -->
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-violet-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    <span class="truncate font-medium">Premium Spent</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-crown text-xs sm:text-sm"></i>
-                    </div>
-                </div>
-                <div class="text-base sm:text-2xl font-bold tracking-tight text-zinc-100 font-mono truncate">${{ (user.total_spent or 0) | usd }}</div>
-                <div class="text-[10px] sm:text-[11px] text-zinc-500 truncate">xHigh usage · ฿{{ (user.total_spent or 0) | thb(usd_to_thb) }}</div>
-            </div>
-
-            <!-- Metric 4: Total Topped Up -->
-            <div class="p-3.5 sm:p-5 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-cyan-500/40 transition-all duration-200 flex flex-col justify-between space-y-2 group shadow-sm">
-                <div class="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
-                    <span class="truncate font-medium">Total Topped Up</span>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0 ml-1.5 shadow-inner">
-                        <i class="fa-solid fa-arrow-down text-xs sm:text-sm"></i>
-                    </div>
-                </div>
-                <div class="text-base sm:text-2xl font-bold tracking-tight text-zinc-100 font-mono truncate">${{ (user.total_topped_up or 0) | usd }}</div>
-                <div class="text-[10px] sm:text-[11px] text-zinc-500 truncate">Deposits · ฿{{ (user.total_topped_up or 0) | thb(usd_to_thb) }}</div>
-            </div>
-
-        </div>
+        <section class="console-summary" data-console-view="overview">
+            <div><span class="console-summary-label"><i class="fa-solid fa-wallet" aria-hidden="true"></i>Wallet balance</span><strong>${{ balance | usd }}</strong><small>≈ ฿{{ balance | thb(usd_to_thb) }} available</small></div>
+            <div><span class="console-summary-label"><i class="fa-solid fa-infinity" aria-hidden="true"></i>Free model access</span><strong class="metric-small">Unlimited</strong><small>{{ models|length }} models · no daily cap</small></div>
+            <div><span class="console-summary-label"><i class="fa-solid fa-chart-simple" aria-hidden="true"></i>Premium spent</span><strong>${{ (user.total_spent or 0) | usd }}</strong><small>Lifetime premium usage</small></div>
+            <div><span class="console-summary-label"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i>Total deposits</span><strong>${{ (user.total_topped_up or 0) | usd }}</strong><small>Lifetime wallet top-ups</small></div>
+        </section>
+        <aside class="console-overview-aside" data-console-view="overview">
+            <div class="console-aside-card"><span class="eyebrow">BUILD WITHOUT THE DETOURS</span><h2>One connection.<br>Every possibility.</h2><p>Your API key opens the door to {{ models|length + premium_models|length }} models. Start with unlimited free access, then scale on your terms.</p><a class="console-button" href="#credentials">Get your API key <span aria-hidden="true">↗</span></a></div>
+            <div class="console-aside-list"><h2>Explore your workspace</h2><a href="#model-library"><i class="fa-solid fa-layer-group" aria-hidden="true"></i>Browse model library<span>→</span></a><a href="#wallet-activity"><i class="fa-solid fa-wallet" aria-hidden="true"></i>Manage your wallet<span>→</span></a><a href="{{ discord_invite }}" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-discord" aria-hidden="true"></i>Talk to the community<span>↗</span></a></div>
+        </aside>
+        <section class="console-getting-started" data-console-view="overview"><div><h2>Your next request starts here.</h2><a class="console-button" href="#credentials">Connect your app <span aria-hidden="true">→</span></a></div><p>Use your existing OpenAI SDK. Change the endpoint, keep your workflow.</p><nav class="console-steps" aria-label="Getting started"><a href="#credentials"><b>1</b>Copy your API credentials</a><a href="#model-library"><b>2</b>Choose your model</a><a href="#usage-analytics"><b>3</b>Track your usage</a></nav></section>
 
         <!-- Section: API Credentials -->
-        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-5">
+        <div id="credentials" data-console-view="api" class="console-panel space-y-5">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800/80 pb-4">
                 <div>
                     <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
                         <i class="fa-solid fa-key text-zinc-400"></i>
-                        <span>API Access Credentials</span>
+                        <span>Your connection details</span>
                     </h2>
-                    <p class="text-xs text-zinc-400 mt-1">[OI]-compatible endpoints. Configure inside Cursor, Cline, NextChat, or custom SDKs.</p>
+                    <p class="text-xs text-zinc-400 mt-1">Keep your API key private. Use these credentials in Cursor, Cline, or your own application.</p>
                 </div>
                 <button onclick="regenerateKey()" class="self-start sm:self-auto py-1.5 px-3 border border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 rounded-md text-xs transition flex items-center space-x-1.5">
-                    <i class="fa-solid fa-rotate text-xs"></i>
-                    <span>Roll Key</span>
+                    <i class="fa-solid fa-rotate text-xs" aria-hidden="true"></i>
+                    <span>Regenerate key</span>
                 </button>
             </div>
 
@@ -214,183 +90,69 @@
                 </div>
             </div>
         </div>
+        <section class="console-api-help" data-console-view="api"><div><span class="eyebrow">QUICKSTART / PYTHON</span><h2>Familiar by design.</h2><p>Install the OpenAI SDK, set your base URL, and send a request. Your key works with every model in your library.</p><p><code>pip install openai</code></p><a class="console-button" href="#model-library">Choose a model <span>→</span></a></div><pre>from openai import OpenAI
+
+client = OpenAI(
+    base_url="{{ api_endpoint }}",
+    api_key="YOUR_API_KEY",
+)
+
+response = client.chat.completions.create(
+    model="{{ models[0] }}",
+    messages=[{"role": "user", "content": "Hello!"}],
+)
+print(response.choices[0].message.content)</pre></section>
+
+        <div class="library-toolbar" data-console-view="models"><div class="console-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="console-model-search" type="search" placeholder="Search models or providers…" aria-label="Search model library"></div><select id="console-model-tier" aria-label="Filter model tier"><option value="all">All models</option><option value="free">Free models</option><option value="premium">Premium models</option></select><span id="model-result-count" role="status">{{ models|length + premium_models|length }} models</span></div>
+        <div class="library-empty" id="model-search-empty" hidden>No models found. Try a different search or tier.</div>
 
         <!-- Section: xHigh Models (Premium) -->
-        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-5">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
-                <div>
-                    <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center flex-wrap gap-x-2 gap-y-1.5">
-                        <i class="fa-solid fa-crown text-violet-400"></i>
-                        <span>xHigh Models ({{ premium_models|length }})</span>
-                        <span class="normal-case tracking-normal inline-flex items-center gap-1 rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-medium text-violet-300">
-                            <i class="fa-solid fa-bolt text-[9px]"></i>Fast &amp; Stable
-                        </span>
-                    </h2>
-                    <p class="text-xs text-zinc-400 mt-1">Flagship tier — try free every day, then billed per token from your wallet.</p>
-                </div>
-                {% if any_trial_remaining %}
-                <span class="self-start sm:self-auto inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
-                    <i class="fa-solid fa-flask text-[10px]"></i>Free trial active
-                </span>
-                {% elif balance > 0 %}
-                <span class="self-start sm:self-auto inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
-                    <i class="fa-solid fa-lock-open text-[10px]"></i>Unlocked
-                </span>
-                {% else %}
-                <span class="self-start sm:self-auto inline-flex items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[11px] font-medium text-violet-300">
-                    <i class="fa-solid fa-lock text-[10px]"></i>Top up to unlock
-                </span>
-                {% endif %}
-            </div>
+        <div id="model-library" data-console-view="models" class="console-panel console-models">
+            <div class="console-models-heading"><div><h2>Premium intelligence</h2><p>Input / output pricing per 1M tokens. Daily trials where available.</p></div><span class="console-tier">{{ 'Trial available' if any_trial_remaining else 'Wallet billing' }}</span></div>
 
             <!-- Premium Models Grid -->
-            <div id="premium-models-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div id="premium-models-grid">
                 {% for m in premium_models %}
-                <div class="premium-model-item p-4 rounded-lg bg-zinc-950/70 border border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900/40 transition group" data-model="{{ m.id }}">
-                    <div class="flex items-start justify-between gap-2">
-                        <div class="space-y-1 min-w-0">
-                            <div class="flex items-center space-x-2">
-                                <span class="h-1.5 w-1.5 rounded-full bg-violet-400 inline-block shrink-0"></span>
-                                <span class="text-xs font-mono font-medium text-zinc-100 group-hover:text-white transition truncate">{{ m.name }}</span>
-                                <span class="rounded bg-violet-500/15 text-violet-400 text-[9px] font-semibold px-1.5 py-0.5 uppercase tracking-wide shrink-0">xHigh</span>
-                            </div>
-                            <div class="text-[11px] text-zinc-500 font-mono flex items-center space-x-1.5 pl-3.5">
-                                <span class="text-zinc-400 font-medium">{{ m.provider }}</span>
-                                <span class="text-zinc-600">·</span>
-                                <span>{{ m.tag }}</span>
-                            </div>
-                        </div>
-                        <button onclick="copyModelName('{{ m.id }}', this)" class="shrink-0 p-2 text-zinc-500 hover:text-zinc-200 bg-zinc-900/60 hover:bg-zinc-800 border border-zinc-800/80 rounded-md transition" title="Copy Model ID">
-                            <i class="fa-solid fa-copy text-xs"></i>
-                        </button>
-                    </div>
-
-                    <!-- Pricing (USD per 1M tokens) -->
-                    <div class="mt-3 grid grid-cols-2 gap-2">
-                        <div class="rounded-md border border-zinc-800/70 bg-zinc-900/50 px-2.5 py-2">
-                            <div class="text-[10px] font-medium uppercase tracking-wider text-zinc-500">Input · 1M</div>
-                            <div class="text-sm font-bold font-mono text-white">${{ "%g"|format(m.price_in_usd) }}</div>
-                            <div class="text-[10px] font-mono text-zinc-600">official <span class="line-through">${{ "%.2f"|format(m.official_in_usd) }}</span></div>
-                        </div>
-                        <div class="rounded-md border border-zinc-800/70 bg-zinc-900/50 px-2.5 py-2">
-                            <div class="text-[10px] font-medium uppercase tracking-wider text-zinc-500">Output · 1M</div>
-                            <div class="text-sm font-bold font-mono text-white">${{ "%g"|format(m.price_out_usd) }}</div>
-                            <div class="text-[10px] font-mono text-zinc-600">official <span class="line-through">${{ "%.2f"|format(m.official_out_usd) }}</span></div>
-                        </div>
-                    </div>
-
-                    <!-- Discount badge -->
-                    <div class="mt-2.5">
-                        <span class="inline-flex items-center gap-1 rounded border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400">
-                            <i class="fa-solid fa-arrow-down text-[8px]"></i>Save {{ m.discount }}%
-                        </span>
-                    </div>
-
+                <div class="premium-model-item console-model-row" data-model="{{ m.id }}" data-library-model="{{ m.id }} {{ provider_name(m.id, m.provider) }}" data-library-tier="premium">
+                    <div class="console-model-identity">{{ provider_logo(m.id, m.provider, 'console-model-logo') }}<div><strong>{{ m.name }}</strong><small>{{ provider_name(m.id, m.provider) }} · {{ m.tag }}</small></div></div>
+                    <div class="console-model-pricing"><div><small>Input / 1M</small><strong>${{ "%g"|format(m.price_in_usd) }}</strong></div><div><small>Output / 1M</small><strong>${{ "%g"|format(m.price_out_usd) }}</strong></div></div>
                     {% set tr = trial_by_model.get(m.id) %}
                     {% if tr and tr.limit > 0 %}
-                    <!-- Daily free-trial meter (this model only) -->
-                    <div class="mt-3 pt-3 border-t border-zinc-800/70 space-y-1.5">
-                        <div class="flex items-center justify-between gap-2 text-[10px]">
-                            <span class="font-medium text-zinc-400 flex items-center gap-1">
-                                <i class="fa-solid fa-flask text-violet-400 text-[9px]"></i>
-                                Free trial today
-                            </span>
-                            <span class="font-mono text-zinc-400 whitespace-nowrap">
-                                <span class="text-zinc-100 font-semibold">{{ "{:,}".format(tr.used) }}</span>
-                                <span class="text-zinc-600"> / </span>{{ "{:,}".format(tr.limit) }}
-                            </span>
-                        </div>
-                        <div class="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                            <div class="h-1.5 rounded-full transition-all duration-300 {% if tr.remaining > 0 %}bg-gradient-to-r from-violet-500 to-violet-400{% else %}bg-amber-500{% endif %}" style="width: {{ tr.pct }}%;"></div>
-                        </div>
-                        <div class="flex items-center justify-between gap-2 text-[9px]">
-                            <span class="text-zinc-600">Resets 00:00 ICT</span>
-                            {% if tr.remaining > 0 %}
-                            <span class="text-violet-300 font-medium font-mono">{{ "{:,}".format(tr.remaining) }} left</span>
-                            {% else %}
-                            <span class="text-amber-400 font-medium">Trial used — wallet billing</span>
-                            {% endif %}
-                        </div>
-                    </div>
+                    <div class="console-trial"><div class="console-trial-label">Daily trial <span>{{ "{:,}".format(tr.remaining) }} left</span></div><div class="console-trial-bar" role="progressbar" aria-label="{{ m.name }} trial used" aria-valuenow="{{ tr.pct }}" aria-valuemin="0" aria-valuemax="100"><div style="width: {{ tr.pct }}%"></div></div><small>{{ "{:,}".format(tr.used) }} / {{ "{:,}".format(tr.limit) }} · resets 00:00 ICT</small></div>
+                    {% else %}<div class="console-trial"><span class="console-tier">Pay as you go</span></div>
                     {% endif %}
+                    <button onclick="copyModelName('{{ m.id }}', this)" class="console-icon-button" title="Copy Model ID" aria-label="Copy {{ m.id }}"><i class="fa-solid fa-copy" aria-hidden="true"></i></button>
                 </div>
                 {% endfor %}
             </div>
         </div>
 
         <!-- Section: Supported Models Catalog -->
-        <div class="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-5">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
-                <div>
-                    <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center flex-wrap gap-x-2 gap-y-1.5">
-                        <i class="fa-solid fa-layer-group text-zinc-400"></i>
-                        <span>Free Models ({{ models|length }})</span>
-                        <span class="normal-case tracking-normal inline-flex items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
-                            <i class="fa-solid fa-infinity text-[9px]"></i>Unlimited
-                        </span>
-                    </h2>
-                    <p class="text-xs text-zinc-400 mt-1">Unlimited usage at no cost via <code class="text-zinc-300 font-mono text-[11px] bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800">/v1/chat/completions</code>. Click any model ID to copy.</p>
-                </div>
-                <!-- Search input (only worth showing once the list is long) -->
-                {% if models|length > 6 %}
-                <div class="relative w-full sm:w-64">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-zinc-500 text-xs"></i>
-                    <input type="text" id="model-search" oninput="filterModels()" placeholder="Search models..." class="w-full bg-zinc-950 border border-zinc-800 rounded-md pl-8 pr-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-700">
-                </div>
-                {% endif %}
-            </div>
+        <div data-console-view="models" class="console-panel console-models">
+            <div class="console-models-heading"><div><h2>Free, by default.</h2><p>Unlimited requests. No wallet charges. No daily cap.</p></div><span class="console-tier free">Always free</span></div>
 
             <!-- Models Grid -->
-            <div id="models-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div id="models-grid">
                 {% for m in models %}
-                <div class="model-item p-3 rounded-lg bg-zinc-950/70 border border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900/40 transition flex items-center justify-between group" data-model="{{ m }}">
-                    <div class="space-y-1 pr-2 overflow-hidden">
-                        <div class="flex items-center space-x-2">
-                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block shrink-0"></span>
-                            <span class="text-xs font-mono font-medium text-zinc-100 group-hover:text-white transition truncate select-all">{{ m }}</span>
-                            <span class="rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-semibold px-1.5 py-0.5 uppercase tracking-wide shrink-0">Free</span>
-                        </div>
-                        <div class="text-[11px] text-zinc-500 font-mono flex items-center space-x-1.5 pl-3.5">
-                            {% if 'deepseek' in m|lower %}
-                            <span class="text-zinc-400 font-medium">DeepSeek</span>
-                            <span class="text-zinc-600">·</span>
-                            <span>Coding & Logic</span>
-                            {% elif 'glm' in m|lower %}
-                            <span class="text-zinc-400 font-medium">ZHIPU AI</span>
-                            <span class="text-zinc-600">·</span>
-                            <span>Bilingual Context</span>
-                            {% elif 'minimax' in m|lower %}
-                            <span class="text-zinc-400 font-medium">MiniMax</span>
-                            <span class="text-zinc-600">·</span>
-                            <span>Deep Context</span>
-                            {% else %}
-                            <span class="text-zinc-400 font-medium">LLM Core</span>
-                            <span class="text-zinc-600">·</span>
-                            <span>High Throughput</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <button onclick="copyModelName('{{ m }}', this)" class="shrink-0 p-2 text-zinc-500 hover:text-zinc-200 bg-zinc-900/60 hover:bg-zinc-800 border border-zinc-800/80 rounded-md transition" title="Copy Model ID">
-                        <i class="fa-solid fa-copy text-xs"></i>
-                    </button>
-                </div>
+                {% set provider = 'DeepSeek' if 'deepseek' in m|lower else 'ZHIPU AI' if 'glm' in m|lower else 'MiniMax' if 'minimax' in m|lower else 'LLM Core' %}
+                <div class="model-item console-model-row console-free-row" data-model="{{ m }}" data-library-model="{{ m }} {{ provider }}" data-library-tier="free"><div class="console-model-identity">{{ provider_logo(m, provider, 'console-model-logo') }}<div><strong>{{ m }}</strong><small>{{ provider }}</small></div></div><div class="console-model-pricing"><div><small>Input / 1M</small><strong>$0.00</strong></div><div><small>Output / 1M</small><strong>$0.00</strong></div></div><div class="console-trial"><span class="console-tier free">Unlimited access</span></div><button onclick="copyModelName('{{ m }}', this)" class="console-icon-button" title="Copy Model ID" aria-label="Copy {{ m }}"><i class="fa-solid fa-copy" aria-hidden="true"></i></button></div>
                 {% endfor %}
             </div>
         </div>
 
         <!-- Section: Wallet Activity -->
-        <div class="p-4 sm:p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+        <section class="console-wallet-banner" data-console-view="wallet"><div><span class="eyebrow">YOUR AVAILABLE BALANCE</span><strong>${{ balance | usd }}</strong><p>≈ ฿{{ balance | thb(usd_to_thb) }} · 1 USD = ฿{{ usd_to_thb | int }}</p></div><div class="console-wallet-info"><div><span>Total deposited</span><b>${{ (user.total_topped_up or 0) | usd }}</b></div><div><span>Premium spent</span><b>${{ (user.total_spent or 0) | usd }}</b></div></div><button class="console-button" onclick="openTopupModal()">Add funds <span aria-hidden="true">＋</span></button></section>
+        <div id="wallet-activity" data-console-view="wallet" class="console-panel space-y-4">
             <div class="flex items-center justify-between gap-3 border-b border-zinc-800/80 pb-3 sm:pb-4">
                 <div>
                     <h2 class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
                         <i class="fa-solid fa-receipt text-emerald-400"></i>
-                        <span>Wallet Activity</span>
+                        <span>Transaction history</span>
                     </h2>
                     <p class="text-[11px] sm:text-xs text-zinc-400 mt-0.5">Top-ups, premium usage charges, and adjustments.</p>
                 </div>
-                <button onclick="openTopupModal()" class="py-1.5 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-md text-xs font-medium transition flex items-center space-x-1.5 shrink-0">
-                    <i class="fa-solid fa-plus text-[10px]"></i>
-                    <span>Top Up</span>
+                <button onclick="openTopupModal()" class="console-button">
+                    <span aria-hidden="true">＋</span><span>Add funds</span>
                 </button>
             </div>
 
@@ -429,15 +191,15 @@
                 {% endfor %}
             </div>
             {% else %}
-            <div class="py-8 text-center text-xs text-zinc-500">
-                <i class="fa-solid fa-receipt text-lg text-zinc-700 mb-2 block"></i>
-                No wallet activity yet. Top up to unlock premium models.
+            <div class="console-empty-state">
+                <i class="fa-solid fa-receipt" aria-hidden="true"></i><strong>A clean slate.</strong>
+                Your top-ups, premium charges, and adjustments will appear here.
             </div>
             {% endif %}
         </div>
 
         <!-- Section: Usage Analytics & Traffic Chart -->
-        <div class="p-4 sm:p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4 sm:space-y-5">
+        <div id="usage-analytics" data-console-view="overview usage" class="console-panel console-analytics space-y-4">
             <div class="flex items-center justify-between gap-3 border-b border-zinc-800/80 pb-3 sm:pb-4">
                 <div>
                     <h2 class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
@@ -762,13 +524,15 @@
         }
 
         async function regenerateKey() {
-            if (!confirm('Are you sure you want to regenerate your API key? Your old key will stop working immediately.')) return;
-            const res = await fetch('/api/user/regenerate-key', { method: 'POST' });
-            if (res.ok) {
+            const result = await consoleActionDialog({ title: 'Regenerate API key?', description: 'Your current key will stop working immediately. Update any connected applications with your new key.', confirm: 'Regenerate key', danger: true });
+            if (!result) return;
+            try {
+                const res = await fetch('/api/user/regenerate-key', { method: 'POST' });
+                if (!res.ok) throw new Error('Could not regenerate your key. Please try again.');
                 const data = await res.json();
                 document.getElementById('api-key-input').value = data.api_key;
-                alert('API Key rolled successfully.');
-            }
+                consoleNotify('Your new API key is ready. Update your connected applications.');
+            } catch (error) { consoleNotify(error.message); }
         }
 
         // ─── Usage analytics chart ───
@@ -781,8 +545,8 @@
             if (usageChartInstance) usageChartInstance.destroy();
             const chartCtx = ctx.getContext('2d');
             const gradient = chartCtx.createLinearGradient(0, 0, 0, 180);
-            gradient.addColorStop(0, 'rgba(34, 211, 238, 0.9)');
-            gradient.addColorStop(1, 'rgba(8, 145, 178, 0.65)');
+            gradient.addColorStop(0, 'rgba(175, 157, 216, 0.95)');
+            gradient.addColorStop(1, 'rgba(103, 88, 138, 0.40)');
             usageChartInstance = new Chart(chartCtx, {
                 type: 'bar',
                 data: {
@@ -791,7 +555,7 @@
                         label: 'Tokens Used',
                         data: data.tokens,
                         backgroundColor: gradient,
-                        hoverBackgroundColor: '#38bdf8',
+                        hoverBackgroundColor: '#cab4ed',
                         borderRadius: 4,
                         borderSkipped: false,
                         maxBarThickness: data.labels.length > 20 ? 10 : 26
@@ -800,6 +564,7 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? false : { duration: 250 },
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
                         legend: { display: false },

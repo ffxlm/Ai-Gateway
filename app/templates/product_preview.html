@@ -1,0 +1,52 @@
+{# A static, anonymous illustration of the real developer overview, not live account data. #}
+{% macro preview_icon(name) -%}
+<svg class="product-icon" width="14" height="14" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+{% if name == 'overview' %}<rect x="2" y="2" width="6.5" height="6.5" rx="1.3"/><rect x="11.5" y="2" width="6.5" height="6.5" rx="1.3"/><rect x="2" y="11.5" width="6.5" height="6.5" rx="1.3"/><rect x="11.5" y="11.5" width="6.5" height="6.5" rx="1.3"/>
+{% elif name == 'models' %}<path d="m10 1 9 5-9 5-9-5 9-5Zm-8.5 9 8.5 4.7 8.5-4.7v2.6L10 17.3l-8.5-4.7V10Zm0 5 8.5 4.7 8.5-4.7v2L10 21.7l-8.5-4.7V15Z" transform="scale(.85) translate(1.7 0)"/>
+{% elif name == 'api' %}<path d="M12.7 1a6.3 6.3 0 0 0-5.8 8.8L1 15.7V19h3.4v-2.6h2.7v-2.7l2.6-2.6A6.3 6.3 0 1 0 12.7 1Zm2 3a1.8 1.8 0 1 1 0 3.6 1.8 1.8 0 0 1 0-3.6Z"/>
+{% elif name == 'usage' %}<rect x="2" y="10" width="4" height="8" rx="1"/><rect x="8" y="3" width="4" height="15" rx="1"/><rect x="14" y="7" width="4" height="11" rx="1"/>
+{% elif name == 'wallet' %}<path d="M3 3h13v2H4a1 1 0 0 0 0 2h13a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm11 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/>
+{% elif name == 'community' %}<path d="M5 4 8 3l.6 1h2.8l.6-1 3 1c2 3 3 7 3 10l-4 2-1-2 2-1c-3 1.5-7 1.5-10 0l2 1-1 2-4-2c0-3 1-7 3-10Zm2 4a1.6 1.6 0 1 0 0 3.2A1.6 1.6 0 0 0 7 8Zm6 0a1.6 1.6 0 1 0 0 3.2A1.6 1.6 0 0 0 13 8Z"/>
+{% endif %}</svg>
+{%- endmacro %}
+<div class="product-stage overview-product-stage" role="group" aria-label="Product preview of the developer Overview. All balances and usage shown are sample data.">
+    <div class="stage-aura" aria-hidden="true"></div>
+    <div class="product-preview-shell">
+        <div class="product-preview-sidebar">
+            <div class="product-preview-brand"><img src="/static/brand.svg" width="25" height="25" alt=""><div>AI Gateway<small>Personal workspace</small></div><span aria-hidden="true">⌄</span></div>
+            <div class="product-sidebar-label">WORKSPACE</div>
+            <div class="product-sidebar-item is-active">{{ preview_icon('overview') }}Overview</div>
+            <div class="product-sidebar-item">{{ preview_icon('models') }}Model library<span>{{ free_models|length + premium_models|length }}</span></div>
+            <div class="product-sidebar-item">{{ preview_icon('api') }}API credentials</div>
+            <div class="product-sidebar-item">{{ preview_icon('usage') }}Usage analytics</div>
+            <div class="product-sidebar-item">{{ preview_icon('wallet') }}Wallet &amp; billing</div>
+            <div class="product-sidebar-label">QUICK LINKS</div>
+            <div class="product-sidebar-item">{{ preview_icon('community') }}Community &amp; support<span aria-hidden="true">↗</span></div>
+            <div class="product-sidebar-bottom"><div class="product-sidebar-wallet"><span>Available balance</span><strong>$12.50</strong><div>Add funds <span aria-hidden="true">＋</span></div></div><div class="product-sidebar-profile"><span class="avatar-letter">D</span><div>Developer<small>Developer account</small></div><span aria-hidden="true">↪</span></div></div>
+        </div>
+        <div class="product-preview-main">
+            <div class="product-preview-topbar"><span>Workspace <span class="breadcrumb-slash">/</span> <strong>Overview</strong></span><span class="product-preview-faux-button">＋ Add funds</span></div>
+            <div class="product-preview-content">
+                <div class="product-preview-heading"><div><span class="eyebrow">YOUR DEVELOPER WORKSPACE</span><h2>Overview</h2><p>A clear view of everything you’re building.</p></div><span class="product-preview-label">Product preview <span>· Sample data</span></span></div>
+                <div class="product-preview-summary">
+                    <div><span>{{ preview_icon('wallet') }}Wallet balance</span><strong>$12.50</strong><small>≈ ฿{{ (12.5 * usd_to_thb) | round(2) }} available</small></div>
+                    <div><span>∞ Free model access</span><strong class="product-unlimited">Unlimited</strong><small>{{ free_models|length }} models · no daily cap</small></div>
+                    <div><span>{{ preview_icon('usage') }}Premium spent</span><strong>$3.25</strong><small>Lifetime premium usage</small></div>
+                    <div><span>↓ Total deposits</span><strong>$15.75</strong><small>Lifetime wallet top-ups</small></div>
+                </div>
+                <div class="product-overview-grid">
+                    <div class="product-usage-panel"><div class="product-usage-heading"><div><h3>Usage Analytics</h3><p>Token consumption and request traffic over time.</p></div><div class="product-range-labels"><span class="is-active">24h</span><span>7d</span><span>30d</span></div></div><div class="product-usage-metrics"><div><span>All-Time</span><strong>226,000 <small>tokens</small></strong></div><div><span>Last 24h</span><strong>226,000 <small>tokens</small></strong></div><div><span>Requests</span><strong>54 <small>calls</small></strong></div></div>
+                        <div class="product-chart" role="img" aria-label="Example token usage: 12,000 at 00:00; 32,000 at 04:00; 18,000 at 08:00; 54,000 at 12:00; 38,000 at 16:00; 72,000 at 20:00. 226,000 tokens in total."><div class="product-chart-axis" aria-hidden="true"><span>80k</span><span>40k</span><span>0</span></div><div class="product-chart-plot" aria-hidden="true"><div><i style="--bar-height: 15%"></i><span>00:00</span></div><div><i style="--bar-height: 40%"></i><span>04:00</span></div><div><i style="--bar-height: 22.5%"></i><span>08:00</span></div><div><i style="--bar-height: 67.5%"></i><span>12:00</span></div><div><i style="--bar-height: 47.5%"></i><span>16:00</span></div><div><i style="--bar-height: 90%"></i><span>20:00</span></div></div></div>
+                    </div>
+                    <div class="product-overview-aside"><span class="eyebrow">BUILD WITHOUT THE DETOURS</span><h3>One connection.<br>Every possibility.</h3><p>Your API key opens the door to {{ free_models|length + premium_models|length }} models. Start with unlimited free access, then scale on your terms.</p><span class="product-preview-faux-button">Get your API key <span aria-hidden="true">↗</span></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="floating-code"><div><span class="code-dot"></span>One connection. Every possibility.<span class="code-language">Python</span></div><pre><span class="syntax-purple">from</span> openai <span class="syntax-purple">import</span> OpenAI
+
+client = OpenAI(
+  base_url=<span class="syntax-green">"{{ api_endpoint }}"</span>,
+  api_key=<span class="syntax-green">"YOUR_API_KEY"</span>
+)</pre><div class="code-foot"><span class="tiny-dot"></span> Compatible with your existing workflow</div></div>
+</div>

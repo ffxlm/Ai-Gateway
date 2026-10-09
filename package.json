@@ -1,0 +1,11 @@
+{
+  "name": "ai-gateway-ui",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i app/static/tailwind.input.css -o app/static/portal.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.0",
+    "tailwindcss": "4.3.0"
+  }
+}

@@ -1,0 +1,42 @@
+<a class="skip-link" href="#console-main">Skip to content</a>
+<button class="console-scrim" type="button" aria-label="Close navigation" hidden></button>
+<aside class="console-sidebar" id="console-sidebar" aria-label="Workspace navigation">
+    <a class="console-workspace" href="{{ '/admin' if console_kind != 'developer' else '/' }}"><img src="/static/brand.svg" width="29" height="29" alt=""><div>AI Gateway<small>{{ 'Administration' if console_kind != 'developer' else 'Personal workspace' }}</small></div><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></a>
+    <div class="console-space-label">WORKSPACE</div>
+    <nav class="console-navigation" aria-label="{{ 'Admin' if console_kind != 'developer' else 'Developer' }} sections">
+        {% if console_kind == 'developer' %}
+        <a href="#overview" data-console-nav="overview"><i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>Overview</a>
+        <a href="#model-library" data-console-nav="models"><i class="fa-solid fa-layer-group" aria-hidden="true"></i>Model library<span class="nav-count">{{ models|length + premium_models|length }}</span></a>
+        <a href="#credentials" data-console-nav="api"><i class="fa-solid fa-key" aria-hidden="true"></i>API credentials</a>
+        <a href="#usage-analytics" data-console-nav="usage"><i class="fa-solid fa-chart-simple" aria-hidden="true"></i>Usage analytics</a>
+        <a href="#wallet-activity" data-console-nav="wallet"><i class="fa-solid fa-wallet" aria-hidden="true"></i>Wallet & billing</a>
+        {% else %}
+        <a href="/admin#overview" {% if console_kind == 'admin' %}data-console-nav="overview"{% endif %}><i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>Overview</a>
+        <a href="/admin#members" {% if console_kind == 'admin' %}data-console-nav="members"{% endif %}><i class="fa-solid fa-users" aria-hidden="true"></i>Members</a>
+        <a href="/admin/requests" {% if console_kind == 'audit' %}class="is-active" aria-current="page"{% endif %}><i class="fa-solid fa-list-check" aria-hidden="true"></i>Request audit</a>
+        <a href="/admin#ledger" {% if console_kind == 'admin' %}data-console-nav="ledger"{% endif %}><i class="fa-solid fa-receipt" aria-hidden="true"></i>Wallet ledger</a>
+        <a href="/admin#reconciliation" {% if console_kind == 'admin' %}data-console-nav="reconciliation"{% endif %}><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>Reconciliation</a>
+        <a href="/admin#payments" {% if console_kind == 'admin' %}data-console-nav="payments"{% endif %}><i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i>Payments</a>
+        <a href="/admin#settings" {% if console_kind == 'admin' %}data-console-nav="settings"{% endif %}><i class="fa-solid fa-sliders" aria-hidden="true"></i>System settings</a>
+        {% endif %}
+    </nav>
+    <div class="console-space-label">QUICK LINKS</div>
+    <nav class="console-navigation secondary" aria-label="Quick links">
+        {% if console_kind == 'developer' %}
+        {% if is_admin %}<a href="/admin"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i>Admin workspace<span>↗</span></a>{% endif %}
+        <a href="{{ discord_invite }}" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-discord" aria-hidden="true"></i>Community & support<span>↗</span></a>
+        {% else %}<a href="/"><i class="fa-solid fa-code" aria-hidden="true"></i>Developer console<span>↗</span></a>{% endif %}
+    </nav>
+    <div class="console-sidebar-bottom">
+        {% if console_kind == 'developer' %}<div class="sidebar-wallet"><span>Available balance</span><strong>${{ balance | usd }}</strong><button type="button" onclick="openTopupModal()">Add funds <span>＋</span></button></div>{% else %}<div class="sidebar-admin-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><div>Admin workspace<small>Manage with confidence.</small></div></div>{% endif %}
+        <div class="console-profile"><img src="{{ user.avatar_url }}" width="30" height="30" alt=""><div><strong>{{ user.username }}</strong><span>{{ 'Administrator' if user.role == 'admin' else 'Developer account' }}</span></div><a href="/auth/logout" aria-label="Sign out" title="Sign out"><i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i></a></div>
+    </div>
+</aside>
+<header class="console-topbar">
+    <div class="console-breadcrumb"><button type="button" class="console-menu-toggle" aria-controls="console-sidebar" aria-expanded="false" aria-label="Open navigation"><i class="fa-solid fa-bars" aria-hidden="true"></i></button><span>{{ 'Workspace' if console_kind == 'developer' else 'Administration' }}</span><span class="crumb-divider">/</span><strong data-console-breadcrumb>{{ 'Request audit' if console_kind == 'audit' else 'Overview' }}</strong></div>
+    <div class="console-topbar-actions">
+        {% if console_kind == 'developer' %}
+        <button class="console-button primary" type="button" onclick="openTopupModal()"><span aria-hidden="true">＋</span> Add funds</button>
+        {% else %}<span class="console-topbar-label"><span class="console-status-dot"></span>Admin access</span><a class="console-button" href="/">Open console <span aria-hidden="true">↗</span></a>{% endif %}
+    </div>
+</header>

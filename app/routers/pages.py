@@ -212,6 +212,7 @@ async def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html", {
         "error": error_msg,
         "free_models": FREE_MODELS,
+        "premium_models": PREMIUM_MODELS,
         "usd_to_thb": _usd_rate(),
         "discord_invite": get_setting("discord_invite_url", settings.DISCORD_INVITE_URL),
         "api_endpoint": api_endpoint,

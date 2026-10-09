@@ -118,6 +118,34 @@ api-portal/
 
 ## Installation & Quick Start
 
+### Frontend styles
+
+The public landing page uses local CSS and JavaScript. The authenticated console
+uses precompiled Tailwind CSS; no runtime Tailwind CDN is required. Compiled
+`app/static/portal.css` is committed so Python and Docker deployments do not need Node.js.
+After changing utility classes in the templates, rebuild it with:
+
+```bash
+npm ci
+npm run build:css
+```
+
+Shared visual styles live in `app/static/design.css`. Motion respects the user's
+reduced-motion preference, and public code examples support keyboard navigation.
+
+Authenticated pages share `app/templates/console_shell.html`. The console's
+sidebar and responsive layouts use `app/static/console.css`, with hash-based
+view navigation in `app/static/console.js`. Developer views include Overview,
+Model Library, API Credentials, Usage, and Wallet; admin controls are separated
+into Members, Ledger, Reconciliation, Payments, and Settings. Existing URLs and
+API contracts remain unchanged.
+
+UI smoke tests use isolated fixtures and do not write to the database:
+
+```bash
+./venv/bin/python -m unittest discover -s tests -v
+```
+
 ### 1. Install Dependencies and Configure the Environment
 
 ```bash
