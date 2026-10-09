@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="AI Gateway Portal",
     description="High-Concurrency OpenAI-Compatible LLM Gateway & Subscription Platform",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan
 )
 
