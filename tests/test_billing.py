@@ -101,6 +101,60 @@ class BillingEndpointTests(unittest.TestCase):
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
+    def test_daily_trial_settings_preserve_defaults_and_allow_overrides(self):
+        from app.core.database import update_setting
+        from app.core.catalog import premium_trial_setting_key
+        from app.services.user_service import premium_trial_limit
+
+        update_setting("premium_trial_tokens_per_day", "1000000")
+        self.assertEqual(premium_trial_limit(DEEPSEEK), 1000000)
+        self.assertEqual(premium_trial_limit("gpt-6-sol"), 200000)
+        self.assertEqual(premium_trial_limit("gpt-6-astra"), 50000)
+        update_setting(premium_trial_setting_key("gpt-6-sol"), "12345")
+        update_setting(premium_trial_setting_key("gpt-6-astra"), "0")
+        update_setting(premium_trial_setting_key(DEEPSEEK), "98765")
+        self.assertEqual(premium_trial_limit("gpt-6-sol"), 12345)
+        self.assertEqual(premium_trial_limit("gpt-6-astra"), 0)
+        self.assertEqual(premium_trial_limit(DEEPSEEK), 98765)
+        update_setting(premium_trial_setting_key("gpt-6-sol"), "invalid")
+        self.assertEqual(premium_trial_limit("gpt-6-sol"), 200000)
+
+    def test_admin_saves_model_trials_without_resetting_usage(self):
+        from app.core.catalog import premium_trial_setting_key
+        from app.services.user_service import premium_trial_limit, premium_trial_used
+
+        self._seed_user(trial_used=1234)
+        with patch("app.routers.pages.get_session_user", return_value={"role": "admin"}):
+            response = self.client.post("/api/admin/settings", data={
+                premium_trial_setting_key(DEEPSEEK): "500",
+                premium_trial_setting_key("gpt-6-sol"): "300000",
+                premium_trial_setting_key("gpt-6-astra"): "0",
+            }, follow_redirects=False)
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/admin#settings")
+        self.assertEqual(premium_trial_limit(DEEPSEEK), 500)
+        self.assertEqual(premium_trial_limit("gpt-6-sol"), 300000)
+        self.assertEqual(premium_trial_limit("gpt-6-astra"), 0)
+        self.assertEqual(premium_trial_used("u-hex", DEEPSEEK), 1234)
+
+    def test_admin_trial_validation_prevents_partial_updates(self):
+        from app.core.database import get_setting
+        from app.core.catalog import premium_trial_setting_key
+
+        for invalid in ["-1", "1.5", "abc", ""]:
+            with self.subTest(value=invalid), patch("app.routers.pages.get_session_user", return_value={"role": "admin"}):
+                response = self.client.post("/api/admin/settings", data={
+                    "usd_to_thb": "999", premium_trial_setting_key("gpt-6-sol"): invalid,
+                }, follow_redirects=False)
+                self.assertEqual(response.status_code, 400)
+                self.assertNotEqual(get_setting("usd_to_thb"), "999")
+        with patch("app.routers.pages.get_session_user", return_value={"role": "admin"}):
+            response = self.client.post("/api/admin/settings", data={premium_trial_setting_key("unknown"): "1"})
+            self.assertEqual(response.status_code, 400)
+        with patch("app.routers.pages.get_session_user", return_value={"role": "user"}):
+            response = self.client.post("/api/admin/settings", data={premium_trial_setting_key(DEEPSEEK): "0"})
+            self.assertEqual(response.status_code, 403)
+
     def _query(self, sql, params=()):
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row

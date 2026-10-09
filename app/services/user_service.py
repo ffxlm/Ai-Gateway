@@ -4,7 +4,7 @@ from typing import Optional, Dict, Any, List
 from zoneinfo import ZoneInfo
 from app.core.database import db_session, get_setting
 from app.core.config import settings
-from app.core.catalog import is_premium_model, premium_price, premium_trial_tokens
+from app.core.catalog import is_premium_model, premium_price, premium_trial_tokens, premium_trial_setting_key
 
 def generate_api_key() -> str:
     return f"sk-portal-{secrets.token_urlsafe(32)}"
@@ -66,9 +66,15 @@ def get_user_by_api_key(api_key: str) -> Optional[Dict[str, Any]]:
 def premium_trial_limit(model: str) -> int:
     """Daily free-trial allowance for a model.
 
-    A per-model value from the catalog wins; otherwise the global
-    ``premium_trial_tokens_per_day`` setting (editable in the Admin panel) is used.
+    An admin override wins, followed by the catalog's per-model default,
+    then the legacy global ``premium_trial_tokens_per_day`` setting.
     """
+    configured = get_setting(premium_trial_setting_key(model), None)
+    if configured is not None:
+        try:
+            return max(int(configured), 0)
+        except (TypeError, ValueError):
+            pass
     override = premium_trial_tokens(model)
     if override is not None:
         try:

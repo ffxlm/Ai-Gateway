@@ -1,4 +1,5 @@
 {% from 'provider_identity.html' import provider_logo, provider_name %}
+{% from 'model_pricing.html' import savings_badge, reference_price, pricing_note %}
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -18,9 +19,9 @@
         }
     </style>
     <link rel="icon" type="image/svg+xml" href="/static/brand.svg">
-    <link rel="stylesheet" href="/static/design.css?v=4">
-    <link rel="stylesheet" href="/static/console.css?v=3">
-    <script src="/static/console.js?v=4" defer></script>
+    <link rel="stylesheet" href="/static/design.css?v=5">
+    <link rel="stylesheet" href="/static/console.css?v=10">
+    <script src="/static/console.js?v=7" defer></script>
 </head>
 <body class="portal-ui console-app text-zinc-100 min-h-screen antialiased" data-console-kind="developer">
 
@@ -90,18 +91,18 @@
                 </div>
             </div>
         </div>
-        <section class="console-api-help" data-console-view="api"><div><span class="eyebrow">QUICKSTART / PYTHON</span><h2>Familiar by design.</h2><p>Install the OpenAI SDK, set your base URL, and send a request. Your key works with every model in your library.</p><p><code>pip install openai</code></p><a class="console-button" href="#model-library">Choose a model <span>→</span></a></div><pre>from openai import OpenAI
+        <section class="console-api-help" data-console-view="api"><div><span class="eyebrow">QUICKSTART / PYTHON</span><h2>Familiar by design.</h2><p>Install the OpenAI SDK, set your base URL, and send a request. Your key works with every model in your library.</p><p><code>pip install openai</code></p><a class="console-button" href="#model-library">Choose a model <span>→</span></a></div><pre><code><span class="syntax-purple">from</span> openai <span class="syntax-purple">import</span> OpenAI
 
 client = OpenAI(
-    base_url="{{ api_endpoint }}",
-    api_key="YOUR_API_KEY",
+    base_url=<span class="syntax-green">"{{ api_endpoint }}"</span>,
+    api_key=<span class="syntax-green">"YOUR_API_KEY"</span>,
 )
 
 response = client.chat.completions.create(
-    model="{{ models[0] }}",
-    messages=[{"role": "user", "content": "Hello!"}],
+    model=<span class="syntax-green">"{{ models[0] }}"</span>,
+    messages=[{<span class="syntax-green">"role"</span>: <span class="syntax-green">"user"</span>, <span class="syntax-green">"content"</span>: <span class="syntax-green">"Hello!"</span>}],
 )
-print(response.choices[0].message.content)</pre></section>
+<span class="syntax-purple">print</span>(response.choices[0].message.content)</code></pre></section>
 
         <div class="library-toolbar" data-console-view="models"><div class="console-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="console-model-search" type="search" placeholder="Search models or providers…" aria-label="Search model library"></div><select id="console-model-tier" aria-label="Filter model tier"><option value="all">All models</option><option value="free">Free models</option><option value="premium">Premium models</option></select><span id="model-result-count" role="status">{{ models|length + premium_models|length }} models</span></div>
         <div class="library-empty" id="model-search-empty" hidden>No models found. Try a different search or tier.</div>
@@ -114,8 +115,8 @@ print(response.choices[0].message.content)</pre></section>
             <div id="premium-models-grid">
                 {% for m in premium_models %}
                 <div class="premium-model-item console-model-row" data-model="{{ m.id }}" data-library-model="{{ m.id }} {{ provider_name(m.id, m.provider) }}" data-library-tier="premium">
-                    <div class="console-model-identity">{{ provider_logo(m.id, m.provider, 'console-model-logo') }}<div><strong>{{ m.name }}</strong><small>{{ provider_name(m.id, m.provider) }} · {{ m.tag }}</small></div></div>
-                    <div class="console-model-pricing"><div><small>Input / 1M</small><strong>${{ "%g"|format(m.price_in_usd) }}</strong></div><div><small>Output / 1M</small><strong>${{ "%g"|format(m.price_out_usd) }}</strong></div></div>
+                    <div class="console-model-identity">{{ provider_logo(m.id, m.provider, 'console-model-logo') }}<div><div class="console-model-title"><strong>{{ m.name }}</strong>{{ savings_badge(m) }}</div><small>{{ provider_name(m.id, m.provider) }} · {{ m.tag }}</small></div></div>
+                    <div class="console-model-pricing"><div><small>Input / 1M</small><strong>${{ "%g"|format(m.price_in_usd) }}</strong>{{ reference_price(m.price_in_usd, m.official_in_usd) }}</div><div><small>Output / 1M</small><strong>${{ "%g"|format(m.price_out_usd) }}</strong>{{ reference_price(m.price_out_usd, m.official_out_usd) }}</div></div>
                     {% set tr = trial_by_model.get(m.id) %}
                     {% if tr and tr.limit > 0 %}
                     <div class="console-trial"><div class="console-trial-label">Daily trial <span>{{ "{:,}".format(tr.remaining) }} left</span></div><div class="console-trial-bar" role="progressbar" aria-label="{{ m.name }} trial used" aria-valuenow="{{ tr.pct }}" aria-valuemin="0" aria-valuemax="100"><div style="width: {{ tr.pct }}%"></div></div><small>{{ "{:,}".format(tr.used) }} / {{ "{:,}".format(tr.limit) }} · resets 00:00 ICT</small></div>
@@ -125,6 +126,7 @@ print(response.choices[0].message.content)</pre></section>
                 </div>
                 {% endfor %}
             </div>
+            {{ pricing_note() }}
         </div>
 
         <!-- Section: Supported Models Catalog -->
@@ -134,7 +136,7 @@ print(response.choices[0].message.content)</pre></section>
             <!-- Models Grid -->
             <div id="models-grid">
                 {% for m in models %}
-                {% set provider = 'DeepSeek' if 'deepseek' in m|lower else 'ZHIPU AI' if 'glm' in m|lower else 'MiniMax' if 'minimax' in m|lower else 'LLM Core' %}
+                {% set provider = 'DeepSeek' if 'deepseek' in m|lower else 'Z.ai' if 'glm' in m|lower else 'MiniMax' if 'minimax' in m|lower else 'LLM Core' %}
                 <div class="model-item console-model-row console-free-row" data-model="{{ m }}" data-library-model="{{ m }} {{ provider }}" data-library-tier="free"><div class="console-model-identity">{{ provider_logo(m, provider, 'console-model-logo') }}<div><strong>{{ m }}</strong><small>{{ provider }}</small></div></div><div class="console-model-pricing"><div><small>Input / 1M</small><strong>$0.00</strong></div><div><small>Output / 1M</small><strong>$0.00</strong></div></div><div class="console-trial"><span class="console-tier free">Unlimited access</span></div><button onclick="copyModelName('{{ m }}', this)" class="console-icon-button" title="Copy Model ID" aria-label="Copy {{ m }}"><i class="fa-solid fa-copy" aria-hidden="true"></i></button></div>
                 {% endfor %}
             </div>
@@ -255,7 +257,7 @@ print(response.choices[0].message.content)</pre></section>
     </footer>
 
     <!-- Top-Up Modal -->
-    <div id="topup-modal" onclick="if(event.target === this) closeTopupModal()" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div id="topup-modal" role="dialog" aria-modal="true" aria-labelledby="topup-modal-title" onclick="if(event.target === this) closeTopupModal()" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
         <div class="bg-zinc-900 border border-zinc-800 max-w-md w-full rounded-2xl p-5 sm:p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto">
 
             <!-- STEP 1: Amount Selection -->
@@ -263,9 +265,9 @@ print(response.choices[0].message.content)</pre></section>
                 <div class="flex items-center justify-between border-b border-zinc-800/80 pb-3">
                     <div class="flex items-center space-x-2">
                         <i class="fa-solid fa-wallet text-emerald-400 text-base"></i>
-                        <h3 class="text-sm font-semibold text-zinc-100">Top Up Wallet</h3>
+                        <h3 id="topup-modal-title" class="text-sm font-semibold text-zinc-100">Top Up Wallet</h3>
                     </div>
-                    <button type="button" onclick="closeTopupModal()" class="text-zinc-500 hover:text-zinc-300 text-sm p-1 rounded-md transition">
+                    <button type="button" aria-label="Close top-up" onclick="closeTopupModal()" class="text-zinc-500 hover:text-zinc-300 text-sm p-1 rounded-md transition">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
@@ -545,8 +547,8 @@ print(response.choices[0].message.content)</pre></section>
             if (usageChartInstance) usageChartInstance.destroy();
             const chartCtx = ctx.getContext('2d');
             const gradient = chartCtx.createLinearGradient(0, 0, 0, 180);
-            gradient.addColorStop(0, 'rgba(175, 157, 216, 0.95)');
-            gradient.addColorStop(1, 'rgba(103, 88, 138, 0.40)');
+            gradient.addColorStop(0, 'rgba(163, 161, 237, 0.80)');
+            gradient.addColorStop(1, 'rgba(163, 161, 237, 0.20)');
             usageChartInstance = new Chart(chartCtx, {
                 type: 'bar',
                 data: {
@@ -555,7 +557,7 @@ print(response.choices[0].message.content)</pre></section>
                         label: 'Tokens Used',
                         data: data.tokens,
                         backgroundColor: gradient,
-                        hoverBackgroundColor: '#cab4ed',
+                        hoverBackgroundColor: '#b7b3ff',
                         borderRadius: 4,
                         borderSkipped: false,
                         maxBarThickness: data.labels.length > 20 ? 10 : 26
@@ -645,17 +647,29 @@ print(response.choices[0].message.content)</pre></section>
         const MIN_TOPUP_THB = {{ min_topup_thb }};
         let currentAmountThb = 0;
         let currentSlipFile = null;
+        let topupPreviousFocus = null;
 
         function openTopupModal() {
+            const modal = document.getElementById('topup-modal');
+            if (!modal.classList.contains('hidden')) return;
+            topupPreviousFocus = document.activeElement;
+            window.consoleCloseNavigation?.();
             backToTopupSelect();
             updateUsdPreview();
-            document.getElementById('topup-modal').classList.remove('hidden');
+            document.body.classList.add('topup-open');
+            modal.classList.remove('hidden');
+            modal.querySelector('[aria-label="Close top-up"]').focus();
         }
 
         function closeTopupModal() {
             document.getElementById('topup-modal').classList.add('hidden');
+            document.body.classList.remove('topup-open');
             removeSelectedSlip();
             hideCheckoutError();
+            const focusTarget = topupPreviousFocus?.isConnected && !topupPreviousFocus.closest('[inert]')
+                ? topupPreviousFocus : document.querySelector('.console-menu-toggle');
+            focusTarget?.focus();
+            topupPreviousFocus = null;
         }
 
         function backToTopupSelect() {
@@ -879,9 +893,19 @@ print(response.choices[0].message.content)</pre></section>
 
         // Close modal on Escape
         window.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                const modal = document.getElementById('topup-modal');
-                if (modal && !modal.classList.contains('hidden')) closeTopupModal();
+            const modal = document.getElementById('topup-modal');
+            if (!modal || modal.classList.contains('hidden')) return;
+            if (e.key === 'Escape') closeTopupModal();
+            if (e.key === 'Tab') {
+                const controls = [...modal.querySelectorAll('button,input,a[href],select,textarea,[tabindex="0"]')]
+                    .filter(control => !control.disabled && control.getClientRects().length);
+                const first = controls[0], last = controls[controls.length - 1];
+                if (!first) return;
+                if (e.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))) {
+                    e.preventDefault(); last.focus();
+                } else if (!e.shiftKey && (document.activeElement === last || !modal.contains(document.activeElement))) {
+                    e.preventDefault(); first.focus();
+                }
             }
         });
 

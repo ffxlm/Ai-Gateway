@@ -32,6 +32,23 @@
         clearTimeout(toastTimeout);
         toastTimeout = setTimeout(() => { toast.hidden = true; }, 6000);
     };
+    document.querySelectorAll('[data-copy-bank-ref]').forEach(button => button.addEventListener('click', async () => {
+        const text = button.dataset.copyBankRef;
+        try {
+            if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+            else {
+                const field = document.createElement('textarea');
+                field.value = text;
+                field.style.cssText = 'position:fixed;opacity:0;pointer-events:none;';
+                document.body.append(field);
+                try {
+                    field.select();
+                    if (!document.execCommand('copy')) throw new Error('Copy failed');
+                } finally { field.remove(); button.focus(); }
+            }
+            window.consoleNotify('Bank reference copied.');
+        } catch { window.consoleNotify('Could not copy. Select the bank reference and copy it manually.'); }
+    }));
     window.consoleActionDialog = options => new Promise(resolve => {
         const dialog = document.getElementById('console-action-dialog');
         if (dialog.open) { resolve(null); return; }
@@ -39,10 +56,19 @@
         const amount = document.getElementById('console-dialog-amount');
         const note = document.getElementById('console-dialog-note');
         const confirm = document.getElementById('console-dialog-confirm');
+        const adjustmentTypes = form.querySelectorAll('input[name="adjustment_type"]');
+        const amountHelp = document.getElementById('console-dialog-amount-help');
         const previousFocus = document.activeElement;
         document.getElementById('console-dialog-title').textContent = options.title;
         document.getElementById('console-dialog-description').textContent = options.description;
         document.getElementById('console-dialog-fields').hidden = !options.fields;
+        document.getElementById('console-dialog-member').hidden = !options.member;
+        document.getElementById('console-dialog-member-name').textContent = options.member || '';
+        adjustmentTypes.forEach(input => { input.checked = input.value === 'credit'; });
+        amountHelp.textContent = 'Enter a positive amount to add to this wallet.';
+        adjustmentTypes.forEach(input => { input.onchange = () => {
+            amountHelp.textContent = input.value === 'debit' ? 'Enter a positive amount to deduct from this wallet.' : 'Enter a positive amount to add to this wallet.';
+        }; });
         amount.required = Boolean(options.fields);
         amount.value = ''; amount.setCustomValidity(''); note.value = '';
         amount.oninput = () => amount.setCustomValidity('');
@@ -52,10 +78,11 @@
         let result = null;
         form.onsubmit = event => {
             event.preventDefault();
-            if (options.fields && (!Number.isFinite(Number(amount.value)) || Number(amount.value) === 0)) {
-                amount.setCustomValidity('Enter a non-zero USD amount.'); amount.reportValidity(); return;
+            if (options.fields && (!Number.isFinite(Number(amount.value)) || Number(amount.value) <= 0)) {
+                amount.setCustomValidity('Enter a USD amount greater than zero.'); amount.reportValidity(); return;
             }
-            result = options.fields ? { amount: Number(amount.value), note: note.value.trim() } : true;
+            const isDebit = form.querySelector('input[name="adjustment_type"]:checked').value === 'debit';
+            result = options.fields ? { amount: Number(amount.value) * (isDebit ? -1 : 1), note: note.value.trim() } : true;
             dialog.close();
         };
         document.getElementById('console-dialog-cancel').onclick = () => dialog.close();
@@ -69,6 +96,7 @@
         scrim.hidden = true;
         updateSidebarAccessibility();
     }
+    window.consoleCloseNavigation = closeNavigation;
     toggle.addEventListener('click', event => {
         const open = !body.classList.contains('navigation-open');
         body.classList.toggle('navigation-open', open);

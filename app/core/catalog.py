@@ -5,6 +5,8 @@ Both the public dashboard (``app.routers.pages``) and the API layer
 premium model lists can never drift apart.
 """
 
+from decimal import Decimal, InvalidOperation, ROUND_DOWN
+
 from app.core.config import settings
 
 # Free tier: unlimited usage, never charged against the wallet.
@@ -17,8 +19,9 @@ FREE_MODELS = [
 # Premium "xHigh" tier: billed per token from the user's USD wallet.
 #
 # Each model may declare its own ``trial_tokens_per_day`` free daily allowance.
-# When omitted (as for DeepSeek below) the global ``premium_trial_tokens_per_day``
-# setting is used instead, so the Admin panel stays in control of the default.
+# Admin settings can override each model's allowance. When no override exists,
+# the catalog value is used, or the global ``premium_trial_tokens_per_day``
+# setting when omitted (as for DeepSeek below).
 # Set it to 0 to give a model no free trial at all.
 #
 # ``max_output_tokens`` bounds the admission-control estimate: a request can
@@ -76,6 +79,22 @@ PREMIUM_MODELS = [
 _PREMIUM_BY_ID = {m["id"]: m for m in PREMIUM_MODELS}
 
 
+def price_savings(current, reference) -> str | None:
+    """Display savings against a reference price, never a hard-coded discount."""
+    try:
+        current, reference = Decimal(str(current)), Decimal(str(reference))
+        if not current.is_finite() or not reference.is_finite():
+            return None
+        if current < 0 or reference <= 0 or current >= reference:
+            return None
+        percent = ((reference - current) / reference * 100).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+        if percent <= 0:
+            return None
+        return format(percent, "f").rstrip("0").rstrip(".")
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+
+
 def is_premium_model(model_id: str) -> bool:
     return model_id in _PREMIUM_BY_ID
 
@@ -98,6 +117,11 @@ def premium_trial_tokens(model_id: str):
     if not m:
         return None
     return m.get("trial_tokens_per_day")
+
+
+def premium_trial_setting_key(model_id: str) -> str:
+    """Persistent admin override for a public model's daily allowance."""
+    return f"premium_trial_tokens_per_day:{model_id}"
 
 
 def premium_price(model_id: str, tokens_in: int, tokens_out: int) -> float:

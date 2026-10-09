@@ -1,0 +1,5 @@
+{% macro table_timestamp(value) -%}
+{% set timestamp = value | default('', true) | string -%}
+{% set parts = timestamp.replace('T', ' ').split(' ', 1) -%}
+{% if timestamp %}<time class="console-table-time" datetime="{{ timestamp.replace(' ', 'T') }}" title="{{ timestamp }}"><span>{{ parts[0] }}</span>{% if parts|length > 1 %}<span>{{ parts[1] }}</span>{% endif %}</time>{% else %}—{% endif %}
+{%- endmacro %}

@@ -1,0 +1,19 @@
+{# Shared price comparisons. Catalog reference rates are not verified official prices. #}
+{% macro savings_badge(model) -%}
+{% set input_saving = model.price_in_usd | price_savings(model.official_in_usd) %}
+{% set output_saving = model.price_out_usd | price_savings(model.official_out_usd) %}
+{% if input_saving and input_saving == output_saving %}
+<span class="price-savings" title="Compared with catalog reference prices for both input and output">Save {{ input_saving }}%</span>
+{% else %}
+{% if input_saving %}<span class="price-savings">Input: save {{ input_saving }}%</span>{% endif %}
+{% if output_saving %}<span class="price-savings">Output: save {{ output_saving }}%</span>{% endif %}
+{% endif %}
+{%- endmacro %}
+
+{% macro reference_price(current, reference) -%}
+{% if current | price_savings(reference) %}<small class="price-reference">Reference <s>${{ "%g" | format(reference) }}</s></small>{% endif %}
+{%- endmacro %}
+
+{% macro pricing_note() -%}
+<p class="pricing-note">Savings compare our prices with catalog reference rates, not a previous Gateway price. Reference rates are not verified official prices. All rates are USD per 1M tokens.</p>
+{%- endmacro %}

@@ -29,10 +29,118 @@
 .console-data-panel .member-search-bar { margin: 18px 23px; max-width: 330px; }.console-data-panel h2 small { display: inline-block; margin-left: 9px; font-size: 9px; font-weight: 400; color: #92839e; }
 .console-toast { position: fixed; right: 24px; bottom: 24px; z-index: 80; max-width: min(420px,calc(100% - 48px)); padding: 16px 20px; background: #33263d; color: #e5c7f4; border: 1px solid #795488; border-radius: 9px; box-shadow: 0 15px 45px #0007; font-size: 12px; line-height: 1.6; }
 .console-app main > .console-data-panel, .console-app main > .audit-filters { padding: 0; }
+/* Reference palette: flat charcoal, fine gray borders, cool readable text. */
+.console-app { --canvas: #08090b; --surface: #111216; --text: #eeeff3; --accent: #a3a1ed; --app-line: #292a32; --app-muted: #858895; --console-raised: #1e1f24; --console-soft: #b5b8c7; --console-strong: #eeeff3; background: var(--canvas) !important; color: var(--text); }
+.console-sidebar { background: #0c0d10; }
+.console-app > .console-topbar { background: #08090bed; }
+.console-workspace, .console-summary strong, .console-app .console-panel h2, .console-model-identity strong, .console-model-pricing strong, .console-dialog h2 { color: var(--console-strong); }
+.console-navigation a.is-active { background: #24252b; color: var(--console-strong); box-shadow: inset 0 0 0 1px #ffffff08; }
+.console-navigation a.is-active i { color: var(--accent); }
+.console-navigation .nav-count { background: #303137; color: var(--console-soft); }
+.sidebar-wallet, .console-summary { background: var(--surface); border-color: var(--app-line); }
+.sidebar-wallet > span, .console-summary-label, .console-summary small, .console-app .workspace-heading .eyebrow, .heading-meta, .console-topbar-label { color: var(--app-muted); }
+.sidebar-wallet button, .sidebar-admin-note, .console-summary-label i, .console-aside-list a i { color: var(--console-soft); }
+.sidebar-admin-note, .console-summary > div, .heading-meta { border-color: var(--app-line); }
+.console-status-dot { background: #83bc9c; }
+.console-button, .console-icon-button, .console-app table button { background: #1e1f24; border-color: #35363d; color: #cacbd3; }
+.console-button:hover, .console-icon-button:hover, .console-app table button:hover { background: #292a30; border-color: #4b4c55; color: var(--console-strong); }
+.console-button.primary, .console-aside-card .console-button, .console-wallet-banner .console-button, .console-app .console-settings button[type=submit], .console-app .audit-filters button[type=submit], .console-app #topup-modal button.bg-emerald-600 { background: #1e1f24; color: #cacbd3; border-color: #35363d; }
+.console-button.primary:hover, .console-aside-card .console-button:hover, .console-wallet-banner .console-button:hover, .console-app .console-settings button[type=submit]:hover, .console-app .audit-filters button[type=submit]:hover, .console-app #topup-modal button.bg-emerald-600:hover { background: #292a30; border-color: #4b4c55; color: var(--console-strong); }
+.console-app main > .console-panel, .console-panel { background: var(--surface) !important; border-color: var(--app-line) !important; }
+.console-app .console-panel > div:first-child, .console-models-heading { border-bottom-color: var(--app-line); }
+.console-app .console-analytics > div:nth-child(2) .uppercase, .console-app .console-analytics > div:nth-child(2) .font-sans { color: var(--app-muted); }
+.console-app .console-analytics > div:nth-child(2) .font-mono { color: var(--console-strong); }
+.console-aside-card, .console-wallet-banner { background: var(--surface); border-color: var(--app-line); }
+.console-aside-card .eyebrow, .console-aside-card p, .console-wallet-banner .eyebrow, .console-wallet-banner p, .console-wallet-info span { color: var(--app-muted); }
+.console-wallet-info b { color: var(--console-strong); }
+.console-aside-list, .console-getting-started, .console-api-help { background: var(--surface); border-color: var(--app-line); }
+.console-aside-list h2, .console-aside-list a, .console-steps a, .console-api-help p { color: var(--console-soft); }
+.console-aside-list a { border-color: var(--app-line); }
+.console-aside-list a:hover { color: var(--console-strong); }
+.console-steps b { background: #24252b; border-color: #35363d; color: var(--console-soft); }
+.console-getting-started p, .library-toolbar > span, .console-model-identity small, .console-model-pricing small, .console-trial-label, .console-trial small, .console-data-panel h2 small { color: var(--app-muted); }
+.console-search input, .library-toolbar select, .console-app #credentials input, .console-app .console-settings input, .console-app .audit-filters input, .console-app .audit-filters select, .console-app #topup-modal input, .console-app #topup-modal .topup-chip, .console-dialog input { background: #0e0f12; border-color: #303137; color: var(--console-strong); }
+.console-app input:focus, .console-app select:focus, .console-dialog input:focus, .console-app #topup-modal .topup-chip:hover { border-color: #777983; }
+.console-tier { border-color: #41424b; background: #ffffff04; color: var(--console-soft); }
+.console-model-row { border-color: var(--app-line); }
+.console-model-row:hover, .console-app table tbody tr:hover { background: var(--console-raised); }
+.console-model-logo { background: linear-gradient(#25262c,#191a1e); border-color: #35363d; color: var(--console-soft); }
+.console-trial-label span { color: var(--console-soft); }
+.console-trial-bar { background: #2b2c33; }
+.console-trial-bar > div { background: var(--accent); }
+.console-api-help pre { background: #0d0e10; border-color: #24252b; color: var(--console-soft); }
+.console-api-help .syntax-purple { color: var(--accent); }
+.console-api-help .syntax-green { color: #a2c6b3; }
+.console-app thead { background: #17181c; }
+.console-app thead th { color: var(--app-muted); border-color: var(--app-line); }
+.console-app tbody td { border-color: var(--app-line); }
+.console-app table tbody .text-violet-300 { color: var(--console-soft); }
+.console-empty-state, .console-empty-state i, .console-empty-state strong { color: var(--app-muted); }
+.console-app .console-settings label, .console-settings-intro, .audit-filters summary, .console-dialog label { color: var(--console-soft); }
+.console-app .console-settings form > .pt-1, .audit-filters[open] summary, .audit-tabs { border-color: var(--app-line); }
+.console-app .console-settings form > .pt-1 p, .audit-filters summary::after, .audit-tabs a, .console-dialog p { color: var(--app-muted); }
+.console-settings-intro { background: #191a1e; border-color: #35363d; }
+.audit-tabs a[aria-current=page] { color: var(--console-strong); border-bottom-color: var(--accent); }
+.console-app > footer { border-color: var(--app-line); color: var(--app-muted); }
+.console-app #topup-modal > div, .console-dialog, .console-toast { background: var(--surface); border-color: #34323f; color: var(--console-strong); }
+.console-app #topup-modal h3 { color: var(--console-strong); }
+.console-app #topup-modal .text-emerald-400 { color: #a1c3b3; }
+.console-toast { border-color: #4b4c55; }
+.console-app #topup-modal { z-index: 70; }
+.console-app.topup-open { overflow: hidden; }
+.console-financial-table th, .console-financial-table td { white-space: nowrap; vertical-align: middle; }
+.console-app .console-financial-table .console-money { text-align: right; font-variant-numeric: tabular-nums; }
+.console-table-user { display: flex; align-items: center; gap: 8px; }
+.console-table-user img { flex-shrink: 0; }
+.console-table-time { display: flex; flex-direction: column; gap: 4px; line-height: 1.4; white-space: nowrap; }
+.console-table-time > span:last-child:not(:first-child) { color: #858895; }
+.console-table-detail { display: block; max-width: 360px; overflow: hidden; text-overflow: ellipsis; }
+.console-bank-reference { display: flex; align-items: center; gap: 8px; }
+.console-bank-reference > span { display: block; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.console-app table .console-bank-reference button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; flex-shrink: 0; }
+.console-model-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.console-model-pricing .price-reference { margin: 6px 0 0; font-size: 8px; line-height: 1.5; color: var(--app-muted); }
+.console-app .console-models > .pricing-note { margin: 0; padding: 14px 23px; border-top: 1px solid var(--app-line); color: var(--app-muted); font-size: 10px; }
+.console-app .console-settings { max-width: none; width: 100%; }
+.console-app .console-settings .console-settings-form { display: flex; flex-direction: column; gap: 28px; }
+.console-settings-group { min-width: 0; margin: 0; padding: 22px 0 0; border: 0; border-top: 1px solid var(--app-line); }
+.console-settings-group legend { float: left; width: 100%; margin-bottom: 6px; padding: 0; color: var(--console-strong); font-size: 13px; font-weight: 500; }
+.console-app .console-settings-group-description { clear: both; margin: 0 0 18px; max-width: 720px; }
+.console-settings-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; max-width: 1100px; }
+.console-settings-trials { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.console-settings-grid > div { min-width: 0; }
+.console-settings-grid small { display: block; margin-top: 6px; color: var(--app-muted); font-size: 10px; }
+.console-app .console-settings form > .console-settings-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0 0; border-top: 1px solid var(--app-line); }
+.console-settings-actions p { margin: 0; }
+.console-app .console-settings .console-settings-actions button { flex-shrink: 0; background: #eeeff2; color: #17181c; border-color: #ffffff21; }
+.console-app .console-settings .console-settings-actions button:hover { background: #fff; }
+@media (max-width:850px) { .console-settings-trials { grid-template-columns: 1fr; } }
+@media (max-width:620px) { .console-settings-grid { grid-template-columns: 1fr; }.console-settings-grid > div { grid-column: 1; }.console-app .console-settings form > .console-settings-actions { flex-direction: column; align-items: stretch; } }
+.console-dialog { position: fixed; inset: 0; margin: auto; width: min(460px,calc(100% - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 28px; }
+.console-dialog::backdrop { background: #0008; backdrop-filter: blur(3px); }
+.console-dialog h2 { margin: 0 0 8px; }
+.console-dialog p { margin: 0 0 20px; }
+.console-dialog-member { padding: 12px 14px; border: 1px solid var(--app-line); background: #191a1e; border-radius: 7px; margin-bottom: 20px; }
+.console-dialog-member > span { display: block; font-size: 9px; letter-spacing: 1px; color: var(--app-muted); }
+.console-dialog-member strong { display: block; margin-top: 5px; font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+.console-adjustment-type { border: 0; padding: 0; margin: 0 0 18px; min-width: 0; }
+.console-adjustment-type legend { padding: 0; margin-bottom: 8px; font-size: 11px; color: var(--console-soft); }
+.console-adjustment-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.console-adjustment-options label { position: relative; margin: 0; cursor: pointer; }
+.console-adjustment-options input { position: absolute; opacity: 0; width: 1px; height: 1px; padding: 0; }
+.console-adjustment-options span { display: block; text-align: center; padding: 10px 8px; background: #0e0f12; border: 1px solid #303137; border-radius: 6px; color: var(--app-muted); }
+.console-adjustment-options input:checked + span { background: #24252b; border-color: #858895; color: var(--console-strong); }
+.console-adjustment-options input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.console-dialog #console-dialog-amount-help { display: block; margin-top: 7px; font-size: 10px; line-height: 1.5; color: var(--app-muted); }
+.console-dialog .console-dialog-actions { gap: 10px; margin-top: 24px; }
+.console-dialog #console-dialog-confirm.primary { background: #eeeff2; border-color: #ffffff21; color: #17181c; }
+.console-dialog #console-dialog-confirm.primary:hover { background: #fff; }
+.console-menu-toggle { color: var(--console-soft); }
 .console-app main > [data-console-view]:not([hidden]) { animation: console-enter .22s ease both; }
 @keyframes console-enter { from { opacity: .4; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 @media (min-width:1600px) { .console-app > main { padding-inline: 58px; }.console-app[data-active-view=overview] > main { grid-template-columns: minmax(0,1fr) 340px; } }
 @media (max-width:1180px) { .console-app { --sidebar-width: 210px; }.console-app > .console-topbar { padding-inline: 25px; }.console-app > main { padding-inline: 25px; }.console-app[data-active-view=overview] > main { grid-template-columns: minmax(0,1fr); }.console-overview-aside { grid-column: 1; grid-row: auto; display: grid; grid-template-columns: 1fr 1fr; }.console-summary > div { padding-inline: 17px; }.console-summary strong { font-size: 25px; }.console-model-row { grid-template-columns: minmax(0,1fr) 130px 150px 30px; gap: 14px; padding: 20px; }.console-model-pricing { gap: 16px; }.console-app .workspace-heading { flex-direction: column; align-items: flex-start; }.heading-meta { display: none; } }
 @media (max-width:850px) { .console-app { --sidebar-width: 0px; }.console-sidebar { width: 232px; transform: translateX(-100%); transition: transform .24s ease; }.navigation-open .console-sidebar { transform: translateX(0); }.navigation-open { overflow: hidden; }.console-menu-toggle { display: grid; place-items: center; padding: 7px 5px; color: #b397c9; font-size: 13px; }.console-app > .console-topbar { padding-inline: 18px; }.console-breadcrumb { gap: 11px; }.console-topbar-actions { gap: 10px; }.console-view-switch > span { display: none; }.console-app > main { padding: 27px 20px; gap: 20px; }.console-model-row { grid-template-columns: minmax(0,1fr) 130px 150px 30px; }.console-api-help { gap: 20px; }.console-app > footer { padding-inline: 20px; } }
 @media (max-width:620px) { .console-app .workspace-heading h1 { font-size: 26px; }.console-summary { grid-template-columns: repeat(2,minmax(0,1fr)); padding: 0; }.console-summary > div { padding: 20px; }.console-summary > div:nth-child(2) { border-right: 0; }.console-summary > div:nth-child(-n+2) { border-bottom: 1px solid #38303f; }.console-summary strong { font-size: 26px; }.console-summary.admin-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }.admin-summary > div:nth-child(3) { border-right: 1px solid #38303f; }.admin-summary > div:nth-child(4) { border-right: 0; border-bottom: 1px solid #38303f; }.console-overview-aside { display: flex; }.console-app .console-panel { padding: 18px; }.console-app .console-data-panel, .console-app .console-models, .console-app .audit-filters { padding: 0; }.console-app .console-analytics > div:last-child { height: 210px; }.console-steps { flex-direction: column; gap: 12px; }.console-model-row { grid-template-columns: minmax(0,1fr) 34px; gap: 18px; padding: 19px; }.console-model-identity { grid-column: 1; }.console-model-row > .console-icon-button { grid-column: 2; grid-row: 1; }.console-model-pricing { grid-column: 1; grid-row: 2; gap: 30px; }.console-trial { grid-column: 1 / -1; grid-row: 3; }.console-free-row .console-trial { grid-column: 1; }.console-models-heading { padding: 18px; }.console-models-heading h2 { font-size: 13px; }.console-models-heading p { font-size: 10px; }.library-toolbar { flex-wrap: wrap; gap: 10px; }.console-search { max-width: none; min-width: 0; }.library-toolbar .console-search { flex-basis: 100%; }.library-toolbar > span { margin-left: auto; }.console-api-help { grid-template-columns: 1fr; padding: 20px; }.console-api-help pre { padding: 15px; font-size: 9px; }.console-wallet-banner { flex-wrap: wrap; padding: 24px; gap: 24px; }.console-wallet-info { width: 100%; gap: 35px; }.console-wallet-banner .console-button { width: 100%; }.console-data-panel > div:first-child { padding: 18px; flex-direction: column; align-items: flex-start; gap: 15px; }.console-data-panel .console-search { max-width: none; width: 100%; flex: auto; }.console-topbar-label { display: none; }.console-breadcrumb { font-size: 10px; }.console-button { font-size: 10px; padding: 7px 10px; }.console-app .console-settings form { gap: 17px; }.console-app .audit-filters form { padding: 18px; }.console-app .console-settings { padding: 20px; }.console-app #credentials > div:first-child { gap: 12px; }.console-app #credentials input { font-size: 10px; }.console-app > footer > div { align-items: flex-start; } }
+@media (max-width:620px) { .console-summary > div:nth-child(-n+2), .admin-summary > div:nth-child(3), .admin-summary > div:nth-child(4) { border-color: var(--app-line); } }
 @media (prefers-reduced-motion:reduce) { .console-sidebar { transition: none; } }

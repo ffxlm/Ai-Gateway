@@ -1,3 +1,4 @@
+{% from 'table_timestamp.html' import table_timestamp %}
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -14,9 +15,9 @@
         }
     </style>
     <link rel="icon" type="image/svg+xml" href="/static/brand.svg">
-    <link rel="stylesheet" href="/static/design.css?v=4">
-    <link rel="stylesheet" href="/static/console.css?v=3">
-    <script src="/static/console.js?v=4" defer></script>
+    <link rel="stylesheet" href="/static/design.css?v=5">
+    <link rel="stylesheet" href="/static/console.css?v=10">
+    <script src="/static/console.js?v=7" defer></script>
 </head>
 <body class="portal-ui console-app text-zinc-100 min-h-screen antialiased" data-console-kind="admin">
 
@@ -100,7 +101,8 @@
             </div>
 
             <div class="console-settings-intro"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>These settings control live traffic and billing. Review rate and provider changes carefully before saving.</span></div>
-            <form action="/api/admin/settings" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form action="/api/admin/settings" method="POST" class="console-settings-form">
+                <fieldset class="console-settings-group"><legend>Wallet & top-ups</legend><p class="console-settings-group-description">Exchange rate and top-up amounts used for wallet deposits.</p><div class="console-settings-grid">
                 <div class="space-y-1">
                     <label class="text-xs font-medium text-zinc-400">USD → THB Rate (1 USD = ? THB)</label>
                     <input type="number" step="0.01" name="usd_to_thb" value="{{ settings.usd_to_thb }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
@@ -116,14 +118,19 @@
                     <input type="text" name="topup_packages_thb" value="{{ settings.topup_packages_thb }}" placeholder="10,35,70,175,350,700" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
                 </div>
 
-                <div class="space-y-1 md:col-span-2">
-                    <label class="text-xs font-medium text-zinc-400">Default Premium Free Trial (tokens / day / model)</label>
-                    <input type="number" step="1000" name="premium_trial_tokens_per_day" value="{{ settings.premium_trial_tokens_per_day }}" placeholder="1000000" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
-                </div>
+                </div></fieldset>
 
-                <div class="space-y-1 md:col-span-2 pt-1">
-                    <p class="text-[10px] uppercase tracking-wider text-zinc-500">Concurrency — max requests in flight at once</p>
+                <fieldset class="console-settings-group"><legend>Daily free-trial allowances</legend><p class="console-settings-group-description">Tokens per user, per day, for each premium model. Set 0 to disable its free trial. Changes do not reset tokens already used today.</p><div class="console-settings-grid console-settings-trials">
+                {% for model in premium_trials %}
+                <div class="space-y-1">
+                    <label for="trial-{{ model.id }}">{{ model.id }}</label>
+                    <input id="trial-{{ model.id }}" type="number" min="0" step="1" required name="{{ model.key }}" value="{{ model.limit }}" aria-describedby="trial-help-{{ model.id }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
+                    <small id="trial-help-{{ model.id }}">tokens / day / user</small>
                 </div>
+                {% endfor %}
+                </div></fieldset>
+
+                <fieldset class="console-settings-group"><legend>Concurrency limits</legend><p class="console-settings-group-description">Maximum requests in flight at once, across the pools and per user.</p><div class="console-settings-grid">
 
                 <div class="space-y-1">
                     <label class="text-xs font-medium text-zinc-400">Free Pool (9Router)</label>
@@ -140,6 +147,9 @@
                     <input type="number" step="1" min="1" name="per_user_concurrency_limit" value="{{ settings.per_user_concurrency_limit }}" placeholder="5" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
                 </div>
 
+                </div></fieldset>
+
+                <fieldset class="console-settings-group"><legend>API connections & support</legend><p class="console-settings-group-description">Endpoints and credentials for free and premium traffic.</p><div class="console-settings-grid">
                 <div class="space-y-1">
                     <label class="text-xs font-medium text-zinc-400">Master 9Router Upstream URL</label>
                     <input type="text" name="master_router_url" value="{{ settings.master_router_url }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
@@ -148,10 +158,6 @@
                 <div class="space-y-1">
                     <label class="text-xs font-medium text-zinc-400">Master 9Router API Key</label>
                     <input type="password" name="master_router_key" value="{{ settings.master_router_key }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
-                </div>
-
-                <div class="space-y-1 md:col-span-2 pt-1">
-                    <p class="text-[10px] uppercase tracking-wider text-zinc-500">Premium (xHigh) Upstream — used for billed models</p>
                 </div>
 
                 <div class="space-y-1">
@@ -169,6 +175,9 @@
                     <input type="text" name="discord_invite_url" value="{{ settings.discord_invite_url }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
                 </div>
 
+                </div></fieldset>
+
+                <fieldset class="console-settings-group"><legend>Payment verification</legend><p class="console-settings-group-description">PromptPay recipient details and SlipOK verification credentials.</p><div class="console-settings-grid">
                 <div class="space-y-1">
                     <label class="text-xs font-medium text-zinc-400">PromptPay ID (เบอร์โทร/เลขบัตร ปชช สำหรับ QR)</label>
                     <input type="text" name="promptpay_id" value="{{ settings.promptpay_id }}" placeholder="08xxxxxxxx หรือเลข 13 หลัก" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
@@ -184,12 +193,15 @@
                     <input type="text" name="slipok_branch_id" value="{{ settings.slipok_branch_id }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
                 </div>
 
-                <div class="space-y-1 md:col-span-2">
+                <div class="space-y-1">
                     <label class="text-xs font-medium text-zinc-400">SlipOK API Key</label>
                     <input type="password" name="slipok_api_key" value="{{ settings.slipok_api_key }}" class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200">
                 </div>
 
-                <div class="md:col-span-2 pt-2">
+                </div></fieldset>
+
+                <div class="console-settings-actions">
+                    <p>Review your changes before saving. They apply to live traffic immediately.</p>
                     <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-semibold transition">
                         Save System Settings
                     </button>
@@ -274,13 +286,13 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-xs">
+                <table class="w-full text-left border-collapse text-xs console-financial-table">
                     <thead>
                         <tr class="border-b border-zinc-800 text-[11px] text-zinc-400 uppercase tracking-wider font-semibold">
                             <th class="py-2.5 px-3">User</th>
                             <th class="py-2.5 px-3">Type</th>
-                            <th class="py-2.5 px-3">Amount</th>
-                            <th class="py-2.5 px-3">Balance After</th>
+                            <th class="py-2.5 px-3 console-money">Amount</th>
+                            <th class="py-2.5 px-3 console-money">Balance after</th>
                             <th class="py-2.5 px-3">Detail</th>
                             <th class="py-2.5 px-3">Time</th>
                         </tr>
@@ -288,21 +300,21 @@
                     <tbody class="divide-y divide-zinc-800/60 text-zinc-300">
                         {% for t in wallet_tx %}
                         <tr class="hover:bg-zinc-850/30 transition">
-                            <td class="py-2.5 px-3 flex items-center space-x-2">
+                            <td class="py-2.5 px-3"><div class="console-table-user">
                                 <img src="{{ t.avatar_url or 'https://cdn.discordapp.com/embed/avatars/0.png' }}" class="w-5 h-5 rounded-full">
                                 <span class="font-medium text-zinc-200">{{ t.username or t.user_id }}</span>
-                            </td>
+                            </div></td>
                             <td class="py-2.5 px-3 uppercase text-[11px] font-semibold
                                 {% if t.tx_type == 'topup' %}text-emerald-400
                                 {% elif t.tx_type == 'usage' %}text-amber-400
                                 {% elif t.tx_type == 'migration' %}text-violet-400
                                 {% else %}text-sky-400{% endif %}">{{ t.tx_type }}</td>
-                            <td class="py-2.5 px-3 font-mono font-bold {% if t.amount_usd >= 0 %}text-emerald-400{% else %}text-zinc-300{% endif %}">
+                            <td class="py-2.5 px-3 font-mono font-bold console-money {% if t.amount_usd >= 0 %}text-emerald-400{% else %}text-zinc-300{% endif %}">
                                 {% if t.amount_usd >= 0 %}+{% endif %}${{ t.amount_usd | usd }}
                             </td>
-                            <td class="py-2.5 px-3 font-mono text-zinc-400">${{ t.balance_after | usd }}</td>
-                            <td class="py-2.5 px-3 text-[11px] text-zinc-400">{{ t.description }}{% if t.model %} · <span class="font-mono text-zinc-500">{{ t.model }}</span>{% endif %}{% if t.tx_type == 'usage' %} · <span class="font-mono text-zinc-500">in {{ "{:,}".format(t.tokens_in or 0) }} / out {{ "{:,}".format(t.tokens_out or 0) }}</span>{% endif %}</td>
-                            <td class="py-2.5 px-3 text-zinc-500 font-mono text-[11px]">{{ t.created_at }}</td>
+                            <td class="py-2.5 px-3 font-mono text-zinc-400 console-money">${{ t.balance_after | usd }}</td>
+                            <td class="py-2.5 px-3 text-[11px] text-zinc-400"><span class="console-table-detail" title="{{ t.description }}{% if t.model %} · {{ t.model }}{% endif %}{% if t.tx_type == 'usage' %} · in {{ '{:,}'.format(t.tokens_in or 0) }} / out {{ '{:,}'.format(t.tokens_out or 0) }}{% endif %}">{{ t.description }}{% if t.model %} · <span class="font-mono text-zinc-500">{{ t.model }}</span>{% endif %}{% if t.tx_type == 'usage' %} · <span class="font-mono text-zinc-500">in {{ "{:,}".format(t.tokens_in or 0) }} / out {{ "{:,}".format(t.tokens_out or 0) }}</span>{% endif %}</span></td>
+                            <td class="py-2.5 px-3 text-zinc-500 font-mono text-[11px]">{{ table_timestamp(t.created_at) }}</td>
                         </tr>
                         {% else %}
                         <tr>
@@ -386,12 +398,12 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-xs">
+                <table class="w-full text-left border-collapse text-xs console-financial-table">
                     <thead>
                         <tr class="border-b border-zinc-800 text-[11px] text-zinc-400 uppercase tracking-wider font-semibold">
                             <th class="py-2.5 px-3">User</th>
-                            <th class="py-2.5 px-3">Amount (THB)</th>
-                            <th class="py-2.5 px-3">Bank Ref (transRef)</th>
+                            <th class="py-2.5 px-3 console-money">Amount (THB)</th>
+                            <th class="py-2.5 px-3">Bank ref</th>
                             <th class="py-2.5 px-3">Time</th>
                             <th class="py-2.5 px-3">Status</th>
                         </tr>
@@ -399,13 +411,13 @@
                     <tbody class="divide-y divide-zinc-800/60 text-zinc-300">
                         {% for p in payments %}
                         <tr class="hover:bg-zinc-850/30 transition">
-                            <td class="py-2.5 px-3 flex items-center space-x-2">
+                            <td class="py-2.5 px-3"><div class="console-table-user">
                                 <img src="{{ p.avatar_url or 'https://cdn.discordapp.com/embed/avatars/0.png' }}" class="w-5 h-5 rounded-full">
                                 <span class="font-medium text-zinc-200">{{ p.username or p.user_id }}</span>
-                            </td>
-                            <td class="py-2.5 px-3 font-mono font-bold text-emerald-400">฿{{ "{:,.2f}".format(p.amount) }}</td>
-                            <td class="py-2.5 px-3 font-mono text-[11px] text-zinc-400">{{ p.trans_ref }}</td>
-                            <td class="py-2.5 px-3 text-zinc-500 font-mono text-[11px]">{{ p.created_at }}</td>
+                            </div></td>
+                            <td class="py-2.5 px-3 font-mono font-bold text-emerald-400 console-money">฿{{ "{:,.2f}".format(p.amount) }}</td>
+                            <td class="py-2.5 px-3 font-mono text-[11px] text-zinc-400"><div class="console-bank-reference"><span title="{{ p.trans_ref }}">{{ p.trans_ref }}</span>{% if p.trans_ref %}<button type="button" data-copy-bank-ref="{{ p.trans_ref }}" aria-label="Copy bank reference" title="Copy bank reference"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>{% endif %}</div></td>
+                            <td class="py-2.5 px-3 text-zinc-500 font-mono text-[11px]">{{ table_timestamp(p.created_at) }}</td>
                             <td class="py-2.5 px-3">
                                 <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/60 border border-emerald-800 text-emerald-400">Verified</span>
                             </td>
@@ -432,7 +444,7 @@
 
     <script>
         async function adjustBalance(userId, username) {
-            const result = await consoleActionDialog({ title: 'Adjust wallet balance', description: `Update the USD balance for ${username}. Use a positive amount to credit, or a negative amount to debit.`, fields: true, confirm: 'Apply adjustment' });
+            const result = await consoleActionDialog({ title: 'Adjust wallet balance', description: 'Choose whether to add or deduct funds, then enter the amount in USD.', member: username, fields: true, confirm: 'Apply adjustment' });
             if (!result) return;
             try {
                 const res = await fetch('/api/admin/adjust-balance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId, amount_usd: result.amount, note: result.note }) });
@@ -471,8 +483,8 @@
             if (platformChartInstance) platformChartInstance.destroy();
             const ctx = canvas.getContext('2d');
             const gradient = ctx.createLinearGradient(0, 0, 0, 180);
-            gradient.addColorStop(0, 'rgba(175, 157, 216, 0.95)');
-            gradient.addColorStop(1, 'rgba(103, 88, 138, 0.40)');
+            gradient.addColorStop(0, 'rgba(163, 161, 237, 0.80)');
+            gradient.addColorStop(1, 'rgba(163, 161, 237, 0.20)');
             platformChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -481,7 +493,7 @@
                         label: 'Tokens Used',
                         data: data.tokens,
                         backgroundColor: gradient,
-                        hoverBackgroundColor: '#cab4ed',
+                        hoverBackgroundColor: '#b7b3ff',
                         borderRadius: 4,
                         borderSkipped: false,
                         maxBarThickness: data.labels.length > 20 ? 10 : 26

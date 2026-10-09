@@ -1,7 +1,12 @@
 <dialog class="console-dialog" id="console-action-dialog" aria-labelledby="console-dialog-title" aria-describedby="console-dialog-description">
     <form id="console-action-form">
         <h2 id="console-dialog-title"></h2><p id="console-dialog-description"></p>
-        <div id="console-dialog-fields" hidden><label for="console-dialog-amount">Amount in USD</label><input id="console-dialog-amount" name="amount" type="number" step="any" placeholder="e.g. 5 or -2.50"><label for="console-dialog-note">Note (optional)</label><input id="console-dialog-note" name="note" type="text" maxlength="500" placeholder="Reason for this adjustment"></div>
+        <div class="console-dialog-member" id="console-dialog-member" hidden><span>MEMBER</span><strong id="console-dialog-member-name"></strong></div>
+        <div id="console-dialog-fields" hidden>
+            <fieldset class="console-adjustment-type"><legend>Adjustment type</legend><div class="console-adjustment-options"><label><input type="radio" name="adjustment_type" value="credit" checked><span>＋ Add funds</span></label><label><input type="radio" name="adjustment_type" value="debit"><span>− Deduct funds</span></label></div></fieldset>
+            <label for="console-dialog-amount">Amount in USD</label><input id="console-dialog-amount" name="amount" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 5.00" aria-describedby="console-dialog-amount-help"><small id="console-dialog-amount-help">Enter a positive amount to add to this wallet.</small>
+            <label for="console-dialog-note">Note (optional)</label><input id="console-dialog-note" name="note" type="text" maxlength="500" placeholder="Reason for this adjustment">
+        </div>
         <div class="console-dialog-actions"><button class="console-button" type="button" id="console-dialog-cancel">Cancel</button><button class="console-button primary" type="submit" id="console-dialog-confirm">Confirm</button></div>
     </form>
 </dialog>

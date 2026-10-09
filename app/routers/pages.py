@@ -6,12 +6,12 @@ import io
 import os
 from app.core.config import settings
 from app.core.database import db_session, get_setting, update_setting
-from app.core.catalog import FREE_MODELS, PREMIUM_MODELS
+from app.core.catalog import FREE_MODELS, PREMIUM_MODELS, premium_trial_setting_key, price_savings
 from app.services.user_service import (
     get_or_create_user, regenerate_user_key, delete_user, toggle_user_ban,
     get_all_users, get_portal_stats, get_user_analytics, get_portal_analytics,
     add_balance, get_wallet_transactions, get_all_wallet_transactions,
-    premium_trial_status, count_request_logs, get_request_logs,
+    premium_trial_status, premium_trial_limit, count_request_logs, get_request_logs,
     get_trial_history, get_reconciliation, get_request_summary, find_user_ids,
 )
 from app.services.payment_service import (
@@ -53,6 +53,7 @@ def _fmt_thb(value, rate) -> str:
 
 templates.env.filters["usd"] = _fmt_usd
 templates.env.filters["thb"] = _fmt_thb
+templates.env.filters["price_savings"] = price_savings
 
 
 def _usd_from_thb(amount_thb: float, rate: float) -> float:
@@ -256,6 +257,11 @@ async def admin_page(request: Request):
         "stats": stats,
         "users": all_users,
         "settings": current_settings,
+        "premium_trials": [
+            {"id": model["id"], "key": premium_trial_setting_key(model["id"]),
+             "limit": premium_trial_limit(model["id"])}
+            for model in PREMIUM_MODELS
+        ],
         "payments": recent_payments,
         "wallet_tx": wallet_tx,
         "analytics": portal_analytics,
@@ -415,9 +421,20 @@ async def admin_update_settings(request: Request):
     if not user or user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Forbidden")
     form = await request.form()
+    trial_keys = {premium_trial_setting_key(model["id"]) for model in PREMIUM_MODELS}
+    # Validate every trial field before writing any settings.
+    for key, value in form.items():
+        if key.startswith("premium_trial_tokens_per_day:") and key not in trial_keys:
+            raise HTTPException(status_code=400, detail="Unknown premium trial model")
+        if key in trial_keys or key == "premium_trial_tokens_per_day":
+            try:
+                if int(value) < 0:
+                    raise ValueError
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Daily trial tokens must be a non-negative integer")
     for k, v in form.items():
         update_setting(k, str(v))
-    return RedirectResponse(url="/admin", status_code=303)
+    return RedirectResponse(url="/admin#settings", status_code=303)
 
 
 @pages_router.get("/api/payment/promptpay-info")
