@@ -69,13 +69,15 @@
         scrim.hidden = true;
         updateSidebarAccessibility();
     }
-    toggle.addEventListener('click', () => {
+    toggle.addEventListener('click', event => {
         const open = !body.classList.contains('navigation-open');
         body.classList.toggle('navigation-open', open);
         toggle.setAttribute('aria-expanded', String(open));
         scrim.hidden = !open;
         updateSidebarAccessibility();
-        if (open) sidebar.querySelector('a').focus();
+        // Only move focus into the sidebar for keyboard activation (detail === 0);
+        // pointer/touch opens should not paint the :focus-visible ring.
+        if (open && event.detail === 0) sidebar.querySelector('a').focus();
     });
     scrim.addEventListener('click', () => { closeNavigation(); toggle.focus(); });
     document.addEventListener('keydown', event => {
