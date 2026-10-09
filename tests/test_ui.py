@@ -77,6 +77,18 @@ class PortalUITests(unittest.TestCase):
         self.assertIn("226,000 tokens in total", preview)
         self.assertNotIn(USER["api_key"], preview)
 
+    def test_public_preview_uses_current_console_palette(self):
+        self.mock("get_session_user", return_value=None)
+        self.assertIn('/static/product-preview.css?v=4', self.client.get('/login').text)
+        css = self.client.get('/static/product-preview.css').text
+        self.assertIn('--preview-line: #292a32', css)
+        self.assertIn('background: var(--surface)', css)
+        self.assertIn('background: #1e1f24; color: #cacbd3; border: 1px solid #35363d', css)
+        self.assertIn('color: var(--accent)', css)
+        self.assertIn('linear-gradient(rgba(163,161,237,.80),rgba(163,161,237,.20))', css)
+        for old_color in ['#bdb3e8', '#d3c8e4', '#26222e', '#aa99cb']:
+            self.assertNotIn(old_color, css)
+
     def test_provider_logos_are_local_and_mapped_by_model(self):
         identity = templates.env.get_template("provider_identity.html").module
         for model, provider, icon in [
