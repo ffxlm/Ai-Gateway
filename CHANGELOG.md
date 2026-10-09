@@ -5,6 +5,28 @@ Newest entries on top. Keep it short — facts, not prose.
 
 ## 2026-10-09
 
+- [done] Fixed premium wallet admission control (root cause of the
+  `hexiiii0743` "money left but 402" report). Two bugs in
+  `app/routers/gateway.py`: (1) the pre-flight hold priced the *whole* estimate
+  at the **output** rate, over-reserving up to ~4x (input is 4x cheaper on the
+  DeepSeek tier); (2) wallet-only mode demanded the balance cover the full
+  worst case, so a wallet that could actually pay was rejected. Now the hold is
+  priced per-side via `catalog.premium_worst_case_cost()` (input-first trial
+  split, mirroring `record_usage`), and wallet-only mode is **use-until-zero**:
+  any positive available balance admits the request, hold capped at available,
+  only an empty wallet is rejected. Error paths already charged nothing and are
+  now covered by tests.
+- [done] Added `tests/test_billing.py` (9 tests, isolated temp DB, stubbed
+  upstream): split pricing, trial input-first, use-until-zero admission, empty
+  wallet 402, upstream error => no charge + hold released + trial untouched,
+  trial-covered-at-zero-balance. Full suite 18/18 green.
+- [done] Lowered `WALLET_RESERVATION_TTL_SECONDS` 600 → 300 (still > the 180s
+  upstream timeout) and added a 60s background janitor (`expire_stale_reservations`
+  in `user_service.py`, wired in `main.py` lifespan) so a crashed request's
+  hold returns promptly even when idle.
+- [done] `_sanitize_error` now logs public model + resolved upstream model + URL
+  server-side, so an operator can tell a config mistake (wrong model id/URL)
+  from a real outage. Never leaked to the client.
 - [done] Bumped app version `1.0.0` → `1.1.0` (`app/main.py`) to mark the
   Linear-inspired UI redesign + focus-outline fix release.
 - [done] Investigated Admin → Requests `Source = est.`: 39 rows have

@@ -109,10 +109,46 @@ def premium_price(model_id: str, tokens_in: int, tokens_out: int) -> float:
            (max(tokens_out, 0) / 1_000_000.0) * m["price_out_usd"]
 
 
+def premium_input_price(model_id: str) -> float:
+    """USD per 1M input tokens (the cheaper side of the price pair)."""
+    m = _PREMIUM_BY_ID.get(model_id)
+    return float(m["price_in_usd"]) if m else 0.0
+
+
 def premium_output_price(model_id: str) -> float:
     """USD per 1M output tokens (the pricier side, used for worst-case holds)."""
     m = _PREMIUM_BY_ID.get(model_id)
     return float(m["price_out_usd"]) if m else 0.0
+
+
+def premium_worst_case_cost(model_id: str, tokens_in: int, tokens_out: int,
+                            trial_remaining: int = 0) -> float:
+    """Worst-case USD a request can cost, after the free trial is applied.
+
+    Prices input and output tokens at their *own* rates instead of multiplying
+    the whole estimate by the output rate. That single-rate shortcut over-held up
+    to ~4x (input is 4x cheaper on the DeepSeek tier) and could reject a wallet
+    that could actually pay.
+
+    The trial split mirrors ``user_service.record_usage`` exactly: the daily
+    allowance is consumed from input tokens first, then output tokens, so the
+    hold and the eventual charge agree on what is billable.
+    """
+    m = _PREMIUM_BY_ID.get(model_id)
+    if not m:
+        return 0.0
+    tokens_in = max(int(tokens_in or 0), 0)
+    tokens_out = max(int(tokens_out or 0), 0)
+    trial_remaining = max(int(trial_remaining or 0), 0)
+
+    free_in = min(tokens_in, trial_remaining)
+    remaining = trial_remaining - free_in
+    free_out = min(tokens_out, remaining)
+    paid_in = tokens_in - free_in
+    paid_out = tokens_out - free_out
+
+    return (paid_in / 1_000_000.0) * m["price_in_usd"] + \
+           (paid_out / 1_000_000.0) * m["price_out_usd"]
 
 
 def premium_max_output_tokens(model_id: str) -> int:

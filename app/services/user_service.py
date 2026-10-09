@@ -207,6 +207,19 @@ def release_reservation(reservation_id: Optional[int], status: str = "released")
         )
 
 
+def expire_stale_reservations() -> int:
+    """Retire holds whose request never settled (crash, disconnect, timeout).
+
+    Returns the number of holds expired. Runs on every reserve/read too, but a
+    periodic caller frees a crashed request's dollars promptly even when no new
+    premium traffic is arriving to trigger the lazy path.
+    """
+    with db_session(immediate=True) as conn:
+        cursor = conn.cursor()
+        _expire_reservations(cursor, _now_str())
+        return int(cursor.rowcount or 0)
+
+
 def record_usage(user_id: str, model: str, tokens_in: int, tokens_out: int,
                  latency_ms: float = 0.0, status_code: int = 200,
                  usage_source: str = "upstream",

@@ -47,9 +47,10 @@ class Settings:
     # pre-flight budget check could not bound a request's worst-case cost.
     PREMIUM_MAX_OUTPUT_TOKENS: int = int(os.getenv("PREMIUM_MAX_OUTPUT_TOKENS", "32768"))
     # How long a wallet reservation is held while its request is in flight.
-    # Must comfortably exceed the 180s upstream timeout; a crashed request
-    # frees its hold automatically once this elapses.
-    WALLET_RESERVATION_TTL_SECONDS: int = int(os.getenv("WALLET_RESERVATION_TTL_SECONDS", "600"))
+    # Must comfortably exceed the 180s upstream timeout, or an in-flight request
+    # could outlive its own hold and let a concurrent one double-spend the same
+    # dollars; a crashed request frees its hold automatically once this elapses.
+    WALLET_RESERVATION_TTL_SECONDS: int = int(os.getenv("WALLET_RESERVATION_TTL_SECONDS", "300"))
     USD_TO_THB: float = float(os.getenv("USD_TO_THB", "35"))
     MIN_TOPUP_THB: int = int(os.getenv("MIN_TOPUP_THB", "10"))
     # Comma-separated THB quick-pick amounts shown in the top-up modal.

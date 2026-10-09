@@ -1,23 +1,47 @@
 import os
+import asyncio
+import contextlib
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.database import init_db
+from app.services.user_service import expire_stale_reservations
 from app.routers.gateway import gateway_router
 from app.routers.auth import auth_router
 from app.routers.pages import pages_router
+
+# How often the reservation janitor retires holds from crashed requests.
+RESERVATION_SWEEP_SECONDS = 60
+
+
+async def _reservation_janitor() -> None:
+    """Periodically expire wallet holds whose request never settled.
+
+    Reservations are also expired lazily on every premium request; this sweep
+    just guarantees the dollars come back promptly during quiet periods.
+    """
+    while True:
+        await asyncio.sleep(RESERVATION_SWEEP_SECONDS)
+        try:
+            expire_stale_reservations()
+        except Exception as exc:  # never let the janitor kill the app
+            print(f"[janitor] reservation expiry failed: {exc}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize SQLite WAL mode database (creates tables + runs migrations)
     init_db()
     print("[✓] AI Gateway Portal database initialized successfully.")
+    janitor = asyncio.create_task(_reservation_janitor())
     try:
         yield
     finally:
         # Shutdown clean up if needed
+        janitor.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await janitor
         print("[*] AI Gateway Portal shutting down gracefully.")
 
 app = FastAPI(

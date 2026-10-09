@@ -39,19 +39,24 @@ def resolve_upstream(model: str) -> Tuple[str, str, str]:
     return _build_chat_url(base), key, upstream_model_id(model)
 
 
-def _sanitize_error(status: int, raw: bytes) -> Tuple[int, str, bytes]:
+def _sanitize_error(status: int, raw: bytes, context: str = "") -> Tuple[int, str, bytes]:
     """Convert an upstream error into a neutral portal error envelope.
 
     The raw body is logged server-side only: provider identity, host names and
     upstream request ids must never reach the client. The returned status code
     is also remapped so an upstream auth failure cannot be mistaken for the
     client's own credentials being wrong.
+
+    ``context`` (public model, resolved upstream model, upstream URL) is added to
+    the server log so an operator can tell a *config* mistake (wrong model id or
+    URL) from a genuine upstream outage, without ever leaking it to the client.
     """
     try:
         text = raw.decode("utf-8", errors="replace")
     except Exception:
         text = str(raw)
-    print(f"[upstream-error] status={status} body={text[:2000]}")
+    where = f" {context}" if context else ""
+    print(f"[upstream-error]{where} status={status} body={text[:2000]}")
 
     if status == 429:
         code, message = 429, "Upstream rate limit reached. Please retry shortly."
@@ -255,7 +260,10 @@ async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, header
         if resp.status_code != 200:
             # Nothing was consumed upstream: drop the hold immediately.
             release_reservation(reservation_id)
-            return _sanitize_error(resp.status_code, resp.content)
+            return _sanitize_error(
+                resp.status_code, resp.content,
+                context=f"public={model} upstream={payload.get('model')} url={url}",
+            )
 
         raw_text = resp.text.strip()
         content_type = resp.headers.get("content-type", "")
@@ -315,7 +323,10 @@ async def handle_streaming_proxy(client: httpx.AsyncClient, url: str, headers: d
         await resp.aclose()
         await client.aclose()
         release_reservation(reservation_id)
-        return _sanitize_error(resp.status_code, err_content)
+        return _sanitize_error(
+            resp.status_code, err_content,
+            context=f"public={model} upstream={payload.get('model')} url={url}",
+        )
 
     async def stream_generator() -> AsyncGenerator[bytes, None]:
         # Incremental decoder so a multi-byte UTF-8 character split across two

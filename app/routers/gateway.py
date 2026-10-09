@@ -5,7 +5,7 @@ from app.services.user_service import (
     reserve_wallet, release_reservation, get_reserved_usd,
 )
 from app.services.proxy_service import forward_chat_completion, fetch_upstream_models, estimate_request_tokens
-from app.core.catalog import is_premium_model, premium_output_price
+from app.core.catalog import is_premium_model, premium_worst_case_cost
 
 gateway_router = APIRouter(prefix="/v1", tags=["[OI] Gateway"])
 
@@ -53,50 +53,59 @@ async def chat_completions(request: Request, user: dict = Depends(get_current_ap
     # single request can never debit past zero:
     #   * While trial remains, the request is never rejected (the trial may
     #     cover it); the balance only holds whatever it can against the overage.
-    #   * Once the trial is exhausted, the wallet must fully cover the worst-case
-    #     token cost, which is held so concurrent requests cannot double-spend.
+    #   * Once the trial is exhausted, the wallet is used until it hits zero:
+    #     any positive available balance admits the request, and the hold is
+    #     capped at that balance. Only a truly empty wallet is rejected.
+    #
+    # The hold is a *worst-case* estimate priced at the model's own input and
+    # output rates (not a single blended rate), which keeps it close to the real
+    # cost instead of over-reserving.
     model = payload.get("model", "")
     reservation_id = 0
     if is_premium_model(model):
         est_in, est_out = estimate_request_tokens(payload, model)
-        est_total = est_in + est_out
         trial_remaining = premium_trial_remaining(user["id"], model)
         balance = float(user.get("balance") or 0)
         available = max(balance - get_reserved_usd(user["id"]), 0.0)
-        # Convert USD to tokens at the priciest (output) rate, for a worst case.
-        price_per_token = premium_output_price(model) / 1_000_000.0
 
-        if trial_remaining <= 0:
-            # Wallet-only mode: it must cover the whole worst case.
-            required = round(est_total * price_per_token, 8)
-            if available <= 0 or required > available + 1e-9:
+        # Worst-case USD this request can cost after the free trial is applied.
+        required = round(premium_worst_case_cost(model, est_in, est_out, trial_remaining), 8)
+
+        if required <= 0:
+            # Fully covered by the free trial: no wallet hold needed.
+            reservation_id = 0
+        elif trial_remaining > 0:
+            # Trial may cover part of it; never reject while trial remains. Hold
+            # only what the balance can actually cover against the overage.
+            hold = round(min(required, available), 8)
+            if hold > 0:
+                reservation_id = reserve_wallet(user["id"], model, hold) or 0
+        else:
+            # Wallet-only: use-until-zero. Admit the request while any balance
+            # remains; cap the hold at the available balance so a concurrent
+            # burst can never over-commit. Only an empty wallet is rejected.
+            if available <= 0:
                 log_rejected_request(user["id"], model, 402)
                 raise HTTPException(
                     status_code=402,
                     detail={"error": {
-                        "message": f"Daily free trial used up and wallet balance is too low to cover this request for '{model}'. Top up or lower max_tokens.",
+                        "message": f"Wallet balance is empty for '{model}'. Top up to continue.",
                         "type": "insufficient_balance",
                         "code": 402,
                     }}
                 )
-            reservation_id = reserve_wallet(user["id"], model, required)
+            hold = round(min(required, available), 8)
+            reservation_id = reserve_wallet(user["id"], model, hold)
             if reservation_id is None:
                 log_rejected_request(user["id"], model, 402)
                 raise HTTPException(
                     status_code=402,
                     detail={"error": {
-                        "message": f"Insufficient available balance to cover this request for '{model}'. Top up or lower max_tokens.",
+                        "message": f"Available balance is already committed by in-flight requests for '{model}'. Retry shortly.",
                         "type": "insufficient_balance",
                         "code": 402,
                     }}
                 )
-        else:
-            # Trial-first: hold only what the balance can cover of the overage.
-            # A request the trial might fully satisfy is never rejected here.
-            billable_est = max(est_total - trial_remaining, 0)
-            hold = round(min(billable_est * price_per_token, available), 8)
-            if hold > 0:
-                reservation_id = reserve_wallet(user["id"], model, hold) or 0
 
     try:
         status_code, content_type, result = await forward_chat_completion(user, payload, reservation_id)
