@@ -6,7 +6,8 @@ body { margin: 0; }
 body.landing, body.portal-ui { background: var(--canvas); color: var(--text); font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
 ::selection { background: #6c66b2; color: white; }
 a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
-:focus-visible { outline: 2px solid #b8b5ff !important; outline-offset: 4px; }
+/* Focus outline system removed by request — no glowing focus ring anywhere. */
+:focus-visible { outline: none !important; }
 .landing a { color: inherit; text-decoration: none; }
 .landing button { font: inherit; cursor: pointer; }
 .landing .container { width: min(1120px, calc(100% - 64px)); margin-inline: auto; }
@@ -94,7 +95,7 @@ a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .workspace-nav a { font-size: 11px; padding: 7px 10px; border-radius: 5px; color: #9c9eaa; transition: color .2s, background .2s; white-space: nowrap; }
 .workspace-nav a:hover { background: #262631; color: #e9e6ff; }
 .portal-ui input, .portal-ui select, .portal-ui textarea { transition: border-color .2s, box-shadow .2s; }
-.portal-ui input:focus, .portal-ui select:focus, .portal-ui textarea:focus { border-color: #8a82be; box-shadow: 0 0 0 3px #a298e010; }
+.portal-ui input:focus, .portal-ui select:focus, .portal-ui textarea:focus { border-color: #8a82be; }
 .portal-ui button, .portal-ui a { transition-duration: .2s; }
 .portal-ui table tbody tr { transition: background .15s; }
 .portal-ui canvas { max-width: 100%; }
