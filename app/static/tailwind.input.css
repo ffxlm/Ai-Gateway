@@ -1,5 +1,6 @@
 @import "tailwindcss" source(none);
 @source "../templates";
+@source "../static/console.js";
 
 @layer base {
     button:not(:disabled), [role="button"] { cursor: pointer; }

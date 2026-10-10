@@ -20,12 +20,24 @@ from app.core.catalog import (
     premium_worst_case_cost,
     premium_input_price,
     premium_output_price,
+    premium_cached_input_price,
+    premium_price,
+    PREMIUM_MODELS,
+    CACHE_INPUT_RATIO,
 )
 from app.core.database import init_db
 from app.services.user_service import get_today_str
 
 DEEPSEEK = "deepseek-v4.1-flash"  # $0.015 in / $0.06 out per 1M tokens
 API_KEY = "sk-portal-test-billing"
+
+# Business constants that make the no-loss guarantee explicit:
+#   * we sell premium tokens at SELL_DISCOUNT_PCT off the official list price,
+#   * InferHub's bid floor caps what we pay at (1 - FLOOR_PCT) * official,
+#   * the provider bills a prompt-cache read at CACHE_BUY_RATIO of its input ask.
+SELL_DISCOUNT_PCT = 90
+FLOOR_PCT = 97
+CACHE_BUY_RATIO = 0.10
 
 
 class _FakeResponse:
@@ -83,6 +95,60 @@ class BillingUnitTests(unittest.TestCase):
 
     def test_unknown_model_costs_nothing(self):
         self.assertEqual(premium_worst_case_cost("nope", 1_000_000, 1_000_000), 0.0)
+
+
+class CachePricingTests(unittest.TestCase):
+    """The cache pass-through must be cheaper for the customer and still profitable."""
+
+    def test_cached_input_price_is_a_tenth_of_input(self):
+        self.assertAlmostEqual(premium_cached_input_price(DEEPSEEK), 0.0015, places=9)
+        self.assertAlmostEqual(premium_cached_input_price("gpt-6-sol"), 0.02, places=9)
+        self.assertAlmostEqual(premium_cached_input_price("gpt-6-astra"), 0.10, places=9)
+
+    def test_unknown_model_has_no_cache_discount(self):
+        # No verified cache rate => full input price (never sell below cost).
+        self.assertEqual(premium_cached_input_price("nope"), 0.0)
+
+    def test_cached_tokens_cost_a_tenth(self):
+        full = premium_price(DEEPSEEK, 1_000_000, 0)
+        cached = premium_price(DEEPSEEK, 1_000_000, 0, tokens_cached=1_000_000)
+        self.assertAlmostEqual(full, 0.015, places=9)
+        self.assertAlmostEqual(cached, 0.0015, places=9)
+        self.assertLess(cached, full)
+
+    def test_cached_count_is_clamped_to_prompt(self):
+        # A lying upstream reporting more cached than prompt must not create a
+        # negative uncached count (which would under-bill).
+        self.assertAlmostEqual(
+            premium_price(DEEPSEEK, 1_000_000, 0, tokens_cached=5_000_000), 0.0015, places=9
+        )
+
+    def test_every_model_keeps_a_positive_margin_at_the_configured_floor(self):
+        # No-loss invariant: we sell at SELL_DISCOUNT_PCT off official and buy at
+        # no more than (1 - FLOOR) * official (the InferHub bid floor). As long as
+        # FLOOR >= SELL_DISCOUNT, every side (input, output, cache) is profitable.
+        self.assertGreaterEqual(FLOOR_PCT, SELL_DISCOUNT_PCT)
+        floor = FLOOR_PCT / 100.0
+        for m in PREMIUM_MODELS:
+            with self.subTest(model=m["id"]):
+                self.assertGreater(m["price_in_usd"], (1 - floor) * m["official_in_usd"])
+                self.assertGreater(m["price_out_usd"], (1 - floor) * m["official_out_usd"])
+                self.assertGreater(
+                    premium_cached_input_price(m["id"]),
+                    (1 - floor) * m["official_in_usd"] * CACHE_BUY_RATIO,
+                )
+
+    def test_cache_is_margin_neutral(self):
+        # Upstream bills a cache read at 0.1x its input ask and we sell it at
+        # 0.1x our input price, so the cache ratio cancels out and the cache
+        # never changes the no-loss condition -- only the floor does.
+        for m in PREMIUM_MODELS:
+            with self.subTest(model=m["id"]):
+                self.assertAlmostEqual(
+                    premium_cached_input_price(m["id"]) / m["price_in_usd"],
+                    CACHE_INPUT_RATIO,
+                    places=9,
+                )
 
 
 class BillingEndpointTests(unittest.TestCase):
@@ -265,6 +331,221 @@ class BillingEndpointTests(unittest.TestCase):
             (DEEPSEEK,),
         )
         self.assertEqual(used[0]["tokens_used"], 1050)
+
+    def test_cache_hit_is_billed_at_the_cached_rate_and_logged(self):
+        """A cache hit must cost less than an all-uncached prompt and be auditable."""
+        self._seed_user(balance=1.0, trial_used=1_000_000)
+        response = _FakeResponse(200, {
+            "id": "chatcmpl-cache", "object": "chat.completion", "model": "cb/deepseek-v4.1-flash",
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"},
+                         "finish_reason": "stop"}],
+            "usage": {
+                "prompt_tokens": 100_000,
+                "prompt_cache_hit_tokens": 90_000,
+                "completion_tokens": 1_000,
+                "cost": 0.0003,
+            },
+        })
+        with self._mock_upstream(response):
+            r = self._post(prompt_chars=400_000)
+
+        self.assertEqual(r.status_code, 200, r.text)
+        expected = (10_000 * 0.015 + 90_000 * 0.0015 + 1_000 * 0.06) / 1e6
+        self.assertAlmostEqual(self._balance(), 1.0 - expected, places=9)
+
+        row = self._query(
+            "SELECT * FROM request_logs WHERE model = ? ORDER BY id DESC LIMIT 1", (DEEPSEEK,)
+        )[0]
+        self.assertEqual(row["tokens_in"], 100_000)
+        self.assertEqual(row["tokens_cached"], 90_000)
+        self.assertAlmostEqual(row["cost_usd"], expected, places=9)
+        self.assertAlmostEqual(row["upstream_cost_usd"], 0.0003, places=9)
+        # Discount given vs. charging the full input rate for cached tokens.
+        self.assertAlmostEqual(row["cache_savings_usd"], 90_000 * (0.015 - 0.0015) / 1e6, places=9)
+
+    def test_cache_hit_is_cheaper_than_no_cache_for_the_same_tokens(self):
+        usage_common = {"prompt_tokens": 100_000, "completion_tokens": 1_000}
+
+        def _reset():
+            conn = sqlite3.connect(self.db_path)
+            try:
+                conn.execute("UPDATE users SET balance = 1.0 WHERE id = 'u-hex'")
+                conn.execute("DELETE FROM model_trial_usage WHERE user_id = 'u-hex'")
+                conn.execute(
+                    "INSERT INTO model_trial_usage (user_id, model, usage_date, tokens_used) "
+                    "VALUES ('u-hex', ?, ?, 1000000)", (DEEPSEEK, get_today_str()),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+        self._seed_user(balance=1.0, trial_used=1_000_000)
+        no_cache = _FakeResponse(200, {
+            "id": "a", "choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"},
+                                    "finish_reason": "stop"}],
+            "usage": dict(usage_common),
+        })
+        with self._mock_upstream(no_cache):
+            self._post(prompt_chars=400_000)
+        charged_no_cache = 1.0 - self._balance()
+
+        _reset()  # reset wallet + trial for a clean second measurement
+        with_cache = _FakeResponse(200, {
+            "id": "b", "choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"},
+                                    "finish_reason": "stop"}],
+            "usage": dict(usage_common, prompt_cache_hit_tokens=90_000),
+        })
+        with self._mock_upstream(with_cache):
+            self._post(prompt_chars=400_000)
+        charged_with_cache = 1.0 - self._balance()
+
+        self.assertLess(charged_with_cache, charged_no_cache)
+        self.assertAlmostEqual(charged_with_cache, 90_000 * 0.0015 / 1e6 + 10_000 * 0.015 / 1e6
+                               + 1_000 * 0.06 / 1e6, places=9)
+
+    def test_cache_aliases_are_understood(self):
+        """[OI]-style prompt_tokens_details.cached_tokens is also a cache hit."""
+        from app.services.proxy_service import _token_breakdown
+        self.assertEqual(_token_breakdown({"prompt_tokens": 100, "cached_tokens": 80}), (100, 80, 0))
+        self.assertEqual(
+            _token_breakdown({"prompt_tokens": 100,
+                              "prompt_tokens_details": {"cached_tokens": 70}}),
+            (100, 70, 0),
+        )
+        self.assertEqual(
+            _token_breakdown({"prompt_tokens": 100, "cache_read_input_tokens": 60}),
+            (100, 60, 0),
+        )
+        # Cached can never exceed the prompt size.
+        self.assertEqual(_token_breakdown({"prompt_tokens": 100, "cached_tokens": 999}), (100, 100, 0))
+
+
+class _FakeReconcileClient:
+    """Stands in for httpx.AsyncClient used by the reconciliation service."""
+
+    payload = {}
+    status = 200
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def get(self, url, params=None, headers=None):
+        outer = self
+
+        class _Resp:
+            status_code = outer.status
+
+            def raise_for_status(self):
+                if outer.status >= 400:
+                    raise RuntimeError(f"HTTP {outer.status}")
+
+            def json(self):
+                return outer.payload
+
+        return _Resp()
+
+
+class ReconcileTests(unittest.TestCase):
+    """Aggregate margin reconciliation: portal billed vs upstream spend."""
+
+    def setUp(self):
+        self.stack = ExitStack()
+        self.addCleanup(self.stack.close)
+        self.tmp = tempfile.mkdtemp(prefix="aigw-reconcile-")
+        self.db_path = os.path.join(self.tmp, "test.db")
+        self.stack.enter_context(patch.object(config_module.settings, "DATABASE_PATH", self.db_path))
+        init_db()
+
+    def _seed_log(self, billed, observed_upstream, tokens_in=1000, tokens_out=100,
+                  cached=0, estimated=False, is_premium=1):
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute(
+                "INSERT INTO request_logs "
+                "(user_id, model, tokens_used, tokens_in, tokens_out, tokens_cached, "
+                " cost_usd, upstream_cost_usd, is_premium, usage_source) "
+                "VALUES ('u-hex', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (DEEPSEEK, tokens_in + tokens_out, tokens_in, tokens_out, cached,
+                 billed, observed_upstream, is_premium,
+                 "estimated" if estimated else "upstream"),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def test_margin_is_billed_minus_upstream_and_gap_is_surfaced(self):
+        from app.services import reconcile_service
+        # 3 premium rows billed at 0.02 total; upstream account says 0.005.
+        self._seed_log(0.008, 0.002)
+        self._seed_log(0.007, 0.002, estimated=True)
+        self._seed_log(0.005, 0.001)
+        # A free row must be excluded from premium reconciliation.
+        self._seed_log(9.99, 9.99, is_premium=0)
+
+        _FakeReconcileClient.payload = {
+            "rangeTotal": 3, "totalCostUsdc": "0.005000",
+            "totalTokens": 3300, "totalSavedUsdc": "1.5",
+        }
+        with patch.object(reconcile_service.httpx, "AsyncClient", _FakeReconcileClient), \
+             patch.object(config_module.settings, "PREMIUM_MANAGEMENT_URL", "https://example.test/api"), \
+             patch.object(config_module.settings, "PREMIUM_UPSTREAM_KEY", "sk-test"):
+            import asyncio
+            data = asyncio.run(reconcile_service.reconcile(days=7))
+
+        self.assertEqual(data["portal"]["requests"], 3)
+        self.assertAlmostEqual(data["portal"]["billed_usd"], 0.020, places=9)
+        self.assertEqual(data["portal"]["estimated_requests"], 1)
+        self.assertAlmostEqual(data["upstream"]["cost_usdc"], 0.005, places=9)
+        self.assertAlmostEqual(data["margin"]["gross_usd"], 0.015, places=9)
+        self.assertEqual(data["margin"]["ratio"], 4.0)
+        # Observed upstream (0.005) equals the account total (0.005): no leak.
+        self.assertAlmostEqual(data["margin"]["observed_vs_upstream_gap_usd"], 0.0, places=9)
+
+    def test_upstream_failure_still_returns_portal_side(self):
+        from app.services import reconcile_service
+        self._seed_log(0.02, 0.004)
+
+        class _Boom(_FakeReconcileClient):
+            status = 500
+
+        with patch.object(reconcile_service.httpx, "AsyncClient", _Boom), \
+             patch.object(config_module.settings, "PREMIUM_MANAGEMENT_URL", "https://example.test/api"), \
+             patch.object(config_module.settings, "PREMIUM_UPSTREAM_KEY", "sk-test"):
+            import asyncio
+            data = asyncio.run(reconcile_service.reconcile(days=7))
+
+        self.assertIsNone(data["upstream"])
+        self.assertIsNotNone(data["upstream_error"])
+        self.assertAlmostEqual(data["portal"]["billed_usd"], 0.02, places=9)
+        self.assertNotIn("margin", data)
+
+    def test_admin_endpoint_requires_admin_and_returns_data(self):
+        from app.main import app
+        client = self.stack.enter_context(TestClient(app))
+
+        _FakeReconcileClient.payload = {
+            "rangeTotal": 1, "totalCostUsdc": "0.002000", "totalTokens": 100, "totalSavedUsdc": "0",
+        }
+        with patch.object(config_module.settings, "PREMIUM_MANAGEMENT_URL", "https://example.test/api"), \
+             patch.object(config_module.settings, "PREMIUM_UPSTREAM_KEY", "sk-test"), \
+             patch("app.services.reconcile_service.httpx.AsyncClient", _FakeReconcileClient):
+            with patch("app.routers.pages.get_session_user", return_value={"role": "user"}):
+                denied = client.get("/api/admin/reconcile?days=7")
+            self.assertEqual(denied.status_code, 403)
+
+            with patch("app.routers.pages.get_session_user", return_value={"role": "admin"}):
+                ok = client.get("/api/admin/reconcile?days=7")
+            self.assertEqual(ok.status_code, 200)
+            body = ok.json()
+            self.assertEqual(body["status"], "ok")
+            self.assertIn("portal", body["data"])
+            self.assertIn("upstream", body["data"])
 
 
 if __name__ == "__main__":

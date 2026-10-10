@@ -134,16 +134,52 @@ def estimate_request_tokens(payload: Dict[str, Any], model: str) -> Tuple[int, i
     return est_in, est_out
 
 
-def _token_breakdown(usage: Dict[str, Any]) -> Tuple[int, int]:
-    """Return (prompt_tokens, completion_tokens) from an upstream usage object."""
+def _token_breakdown(usage: Dict[str, Any]) -> Tuple[int, int, int]:
+    """Return (prompt_tokens, cached_tokens, completion_tokens) from usage.
+
+    ``cached_tokens`` is the cache-read subset of ``prompt_tokens``. Upstreams
+    spell this field differently (DeepSeek: ``prompt_cache_hit_tokens``,
+    [OI]: ``prompt_tokens_details.cached_tokens``, Anthropic:
+    ``cache_read_input_tokens``), so every known alias is tried and the result
+    is clamped to the prompt size.
+    """
     if not usage:
-        return 0, 0
+        return 0, 0, 0
     prompt = int(usage.get("prompt_tokens") or 0)
     completion = int(usage.get("completion_tokens") or 0)
+
+    cached = usage.get("prompt_cache_hit_tokens")
+    if cached is None:
+        cached = usage.get("cached_tokens")
+    if cached is None:
+        details = usage.get("prompt_tokens_details") or {}
+        cached = details.get("cached_tokens") if isinstance(details, dict) else None
+    if cached is None:
+        cached = usage.get("cache_read_input_tokens")
+    try:
+        cached = int(cached or 0)
+    except (TypeError, ValueError):
+        cached = 0
+    cached = min(max(cached, 0), max(prompt, 0))
+
     if prompt == 0 and completion == 0:
         # Only a total is available: attribute it to output (the pricier side).
-        return 0, int(usage.get("total_tokens") or 0)
-    return prompt, completion
+        return 0, 0, int(usage.get("total_tokens") or 0)
+    return prompt, cached, completion
+
+
+def _upstream_cost(usage: Dict[str, Any]) -> float:
+    """The provider's own charge for this request, when it reports one.
+
+    InferHub returns ``usage.cost`` (USDC). We never bill from it, but we store
+    it so admin can compare what we paid against what we charged (real margin).
+    """
+    if not usage:
+        return 0.0
+    try:
+        return max(float(usage.get("cost") or 0.0), 0.0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 async def forward_chat_completion(user: Dict[str, Any], payload: Dict[str, Any],
@@ -272,14 +308,17 @@ async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, header
         if "text/event-stream" in content_type or raw_text.startswith("data:"):
             aggregated = _aggregate_sse(raw_text, model)
             if aggregated is not None:
-                tokens_in, tokens_out = _token_breakdown(aggregated.get("usage") or {})
+                usage = aggregated.get("usage") or {}
+                tokens_in, tokens_cached, tokens_out = _token_breakdown(usage)
+                upstream_cost = _upstream_cost(usage)
                 source = "upstream"
                 if tokens_in == 0 and tokens_out == 0:
                     content = aggregated["choices"][0]["message"].get("content", "")
                     tokens_out = max(len(content) // 4 + 50, 100)
                     source = "estimated"
                 record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency,
-                             status_code=200, usage_source=source, reservation_id=reservation_id)
+                             status_code=200, usage_source=source, reservation_id=reservation_id,
+                             tokens_cached=tokens_cached, upstream_cost_usd=upstream_cost)
                 return 200, "application/json", json.dumps(aggregated, ensure_ascii=False).encode("utf-8")
 
         if "data: [DONE]" in raw_text:
@@ -297,7 +336,8 @@ async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, header
             data["model"] = model
         clean_bytes = json.dumps(data, ensure_ascii=False).encode("utf-8")
 
-        tokens_in, tokens_out = _token_breakdown(data.get("usage") or {})
+        tokens_in, tokens_cached, tokens_out = _token_breakdown(data.get("usage") or {})
+        upstream_cost = _upstream_cost(data.get("usage") or {})
         source = "upstream"
         if tokens_in == 0 and tokens_out == 0:
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
@@ -305,7 +345,8 @@ async def handle_non_streaming_proxy(client: httpx.AsyncClient, url: str, header
             source = "estimated"
 
         record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency,
-                     status_code=200, usage_source=source, reservation_id=reservation_id)
+                     status_code=200, usage_source=source, reservation_id=reservation_id,
+                     tokens_cached=tokens_cached, upstream_cost_usd=upstream_cost)
         return 200, "application/json", clean_bytes
     except Exception:
         release_reservation(reservation_id)
@@ -334,7 +375,9 @@ async def handle_streaming_proxy(client: httpx.AsyncClient, url: str, headers: d
         decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         buffer = ""
         tokens_in = 0
+        tokens_cached = 0
         tokens_out = 0
+        upstream_cost = 0.0
         collected_chunks = 0
         settled = False
         try:
@@ -349,7 +392,8 @@ async def handle_streaming_proxy(client: httpx.AsyncClient, url: str, headers: d
                         try:
                             parsed = json.loads(raw_line[6:].strip())
                             if parsed.get("usage"):
-                                tokens_in, tokens_out = _token_breakdown(parsed["usage"])
+                                tokens_in, tokens_cached, tokens_out = _token_breakdown(parsed["usage"])
+                                upstream_cost = _upstream_cost(parsed["usage"])
                             collected_chunks += 1
                         except Exception:
                             pass
@@ -367,7 +411,8 @@ async def handle_streaming_proxy(client: httpx.AsyncClient, url: str, headers: d
 
             latency = (time.time() - start_time) * 1000
             record_usage(user["id"], model, tokens_in, tokens_out, latency_ms=latency,
-                         status_code=200, usage_source=source, reservation_id=reservation_id)
+                         status_code=200, usage_source=source, reservation_id=reservation_id,
+                         tokens_cached=tokens_cached, upstream_cost_usd=upstream_cost)
             settled = True
         finally:
             if not settled:

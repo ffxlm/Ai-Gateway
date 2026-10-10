@@ -3,6 +3,56 @@
 Agent working memory. Read this first; update it after every completed unit of work.
 Newest entries on top. Keep it short — facts, not prose.
 
+## 2026-10-10
+
+- [done] Added **read-only premium margin reconciliation** (`app/services/reconcile_service.py`,
+  admin API `GET /api/admin/reconcile?days=N`, card in Admin → Reconciliation).
+  It compares three numbers for a UTC day window: portal billed
+  (`Σ request_logs.cost_usd`), portal-observed upstream (`Σ upstream_cost_usd`),
+  and the upstream account's own spend (`InferHub /api/usage/logs` totals).
+  Gross margin = billed − paid. The observed-vs-account **gap** is the key
+  signal: it exposes usage billed to us that the portal never saw (estimated
+  streams, or the key being used outside the portal). Deliberately aggregate and
+  billing-neutral — no per-request back-charge (cannot be matched reliably and
+  would break the "price shown = price charged" contract). New setting
+  `PREMIUM_MANAGEMENT_URL` (default `https://inferhub.dev/api`).
+- [note] Live check exposed exactly that signal: the account shows 6,436
+  upstream requests / 0.5745 USDC in 7 days while this (dev) portal.db logged
+  62 premium rows, all stale (Oct 4–6). Reconciliation is only meaningful when
+  the portal is the sole consumer of the upstream key — use a dedicated key.
+- [done] Added `@source "../static/console.js"` to `tailwind.input.css` and
+  rebuilt `portal.css`, so utility classes emitted by the console script (not
+  just templates) are compiled.
+- [done] Added prompt-cache pass-through billing for premium models. InferHub
+  bills a cache-read input token at 0.1x the input ask (measured from
+  `usage.cost` on cb/deepseek-v4.1-flash, cb/gpt-6-sol, cb/gpt-6-astra:
+  0.099–0.100x). We now pass the same ratio to customers so the cache margin
+  equals the normal margin instead of being captured. `catalog.py`: added
+  `CACHE_INPUT_RATIO`, per-model `price_cached_in_usd`, `premium_cached_input_price()`
+  and a `tokens_cached` arg on `premium_price()` (defaults to full input rate when
+  a model has no verified cache rate, so we never sell below cost).
+- [done] `proxy_service._token_breakdown()` now returns
+  `(prompt, cached, completion)`, reading every cache alias
+  (`prompt_cache_hit_tokens`, `cached_tokens`, `prompt_tokens_details.cached_tokens`,
+  `cache_read_input_tokens`) and clamping to the prompt. Added `_upstream_cost()`
+  to capture the provider's own `usage.cost`.
+- [done] `record_usage()` bills cached tokens at the cached rate, keeps the
+  trial split input-first (uncached before cached, then output) consistent with
+  `premium_worst_case_cost` (which still holds at the all-uncached worst case),
+  and writes `tokens_cached`, `cache_savings_usd`, `upstream_cost_usd` to
+  `request_logs` (new idempotent migration + admin CSV columns).
+- [done] Verified live end-to-end. Non-streaming: 2 identical 40k-token calls,
+  call 2 hit 99.8% cache, charged $0.0000804 (predicted exactly), saved the
+  customer $0.000534, margin 8.0x vs provider cost. Streaming: usage carries the
+  cache split via `prompt_tokens_details.cached_tokens` only on a cache hit
+  (absent otherwise), captured correctly (34,944/35,033 cached, charge matched).
+  Note: streaming usage omits the richer fields; `usage.cost` is floored at
+  1e-5 USDC, and routing ask varies ~10x per request (bounded by the 98% bid
+  floor). Tests: 33/33 green.
+- [watch] `minDiscountPct=98.00` causes `402 no_provider_under_bid` on busy
+  models (seen on alicn/deepseek-v4.1-flash) — tune per-model budget rather than
+  removing the floor (the floor is what keeps buy ≤ 2% of official).
+
 ## 2026-10-09
 
 - [done] Fixed premium wallet admission control (root cause of the

@@ -178,6 +178,56 @@
         document.getElementById('model-result-count').textContent = `${count} models`;
     }
     if (modelSearch) { modelSearch.addEventListener('input', filterLibrary); modelTier.addEventListener('change', filterLibrary); }
+    // Premium margin reconciliation (read-only; admin only).
+    const reconcileRoot = document.querySelector('[data-reconcile-root]');
+    if (reconcileRoot) {
+        const runBtn = reconcileRoot.querySelector('[data-reconcile-run]');
+        const daysSel = reconcileRoot.querySelector('[data-reconcile-days]');
+        const out = reconcileRoot.querySelector('[data-reconcile-result]');
+        const usd = n => '$' + Number(n || 0).toFixed(6);
+        const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const cell = (label, value, cls) => `<div class="px-3 py-1"><div class="text-[11px] uppercase tracking-wider text-zinc-400">${label}</div><div class="font-mono ${cls || 'text-zinc-200'}">${value}</div></div>`;
+        const render = d => {
+            const p = d.portal;
+            const cells = [];
+            cells.push(cell('Billed (customers)', usd(p.billed_usd), 'text-emerald-400'));
+            if (d.upstream) {
+                cells.push(cell('Paid upstream', usd(d.upstream.cost_usdc), 'text-amber-300'));
+                const m = d.margin || {};
+                cells.push(cell('Gross margin', `${usd(m.gross_usd)}${m.ratio ? ` · ${m.ratio}x` : ''}`, m.gross_usd >= 0 ? 'text-emerald-400' : 'text-rose-400'));
+            } else {
+                cells.push(cell('Paid upstream', 'unavailable', 'text-rose-400'));
+                cells.push(cell('Gross margin', '—', 'text-zinc-500'));
+            }
+            const notes = [];
+            notes.push(`Portal premium requests: <span class="font-mono text-zinc-300">${p.requests}</span> · tokens in/out/cached: <span class="font-mono text-zinc-300">${p.tokens_in}/${p.tokens_out}/${p.tokens_cached}</span>`);
+            if (d.upstream) {
+                const gap = (d.margin && d.margin.observed_vs_upstream_gap_usd) || 0;
+                const gapCls = Math.abs(gap) > 0.01 ? 'text-amber-300' : 'text-zinc-400';
+                notes.push(`Observed upstream (from responses): <span class="font-mono text-zinc-300">${usd(p.observed_upstream_usd)}</span> · <span class="${gapCls}">gap vs account ${usd(gap)}</span>`);
+            }
+            if (p.estimated_requests > 0) {
+                notes.push(`<span class="text-amber-300">${p.estimated_requests} request(s) with unverifiable usage (never billed).</span>`);
+            }
+            if (d.upstream_error) {
+                notes.push(`<span class="text-rose-400">Upstream usage unavailable: ${esc(d.upstream_error)}</span>`);
+            }
+            out.innerHTML = `<div class="grid grid-cols-3 divide-x divide-zinc-800/80 bg-zinc-950/70 rounded-lg border border-zinc-800/80 py-2 shadow-inner">${cells.join('')}</div>`
+                + `<div class="mt-3 space-y-1 text-[11px] text-zinc-400">${notes.map(n => `<div>${n}</div>`).join('')}</div>`;
+        };
+        runBtn.addEventListener('click', async () => {
+            runBtn.disabled = true;
+            out.textContent = 'Running reconciliation…';
+            try {
+                const res = await fetch(`/api/admin/reconcile?days=${encodeURIComponent(daysSel.value)}`, { headers: { Accept: 'application/json' } });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const { data } = await res.json();
+                render(data);
+            } catch (err) {
+                out.innerHTML = `<span class="text-rose-400">Reconciliation failed: ${esc(err.message)}</span>`;
+            } finally { runBtn.disabled = false; }
+        });
+    }
     // Associate legacy form labels without changing field names or API contracts.
     document.querySelectorAll('.console-app label').forEach((label, index) => {
         if (label.htmlFor || label.querySelector('input')) return;

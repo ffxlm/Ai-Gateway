@@ -4,7 +4,10 @@ from typing import Optional, Dict, Any, List
 from zoneinfo import ZoneInfo
 from app.core.database import db_session, get_setting
 from app.core.config import settings
-from app.core.catalog import is_premium_model, premium_price, premium_trial_tokens, premium_trial_setting_key
+from app.core.catalog import (
+    is_premium_model, premium_price, premium_trial_tokens, premium_trial_setting_key,
+    premium_input_price, premium_cached_input_price,
+)
 
 def generate_api_key() -> str:
     return f"sk-portal-{secrets.token_urlsafe(32)}"
@@ -229,12 +232,18 @@ def expire_stale_reservations() -> int:
 def record_usage(user_id: str, model: str, tokens_in: int, tokens_out: int,
                  latency_ms: float = 0.0, status_code: int = 200,
                  usage_source: str = "upstream",
-                 reservation_id: Optional[int] = None) -> float:
+                 reservation_id: Optional[int] = None,
+                 tokens_cached: int = 0,
+                 upstream_cost_usd: float = 0.0) -> float:
     """Log a completed request and settle its cost in one atomic transaction.
 
     Free models are never charged. Premium models consume the daily free trial
     first (input tokens, then output tokens); anything beyond the trial is billed
     from the wallet at the model's per-token rates.
+
+    ``tokens_in`` is the total prompt size and ``tokens_cached`` is the
+    cache-read subset, billed at the model's cheaper cached-input rate. Passing
+    ``tokens_cached=0`` reproduces the old all-uncached behaviour.
 
     Two guarantees are enforced here:
 
@@ -256,6 +265,8 @@ def record_usage(user_id: str, model: str, tokens_in: int, tokens_out: int,
     """
     tokens_in = max(int(tokens_in or 0), 0)
     tokens_out = max(int(tokens_out or 0), 0)
+    tokens_cached = min(max(int(tokens_cached or 0), 0), tokens_in)
+    uncached_in = tokens_in - tokens_cached
     total_tokens = tokens_in + tokens_out
 
     is_premium = is_premium_model(model)
@@ -265,7 +276,9 @@ def record_usage(user_id: str, model: str, tokens_in: int, tokens_out: int,
     trial_tokens = 0
     paid_tokens = 0
     paid_in = 0
+    paid_cached = 0
     paid_out = 0
+    cache_savings = 0.0
     charge = 0.0
     unbilled = 0.0
     balance_before = 0.0
@@ -285,18 +298,31 @@ def record_usage(user_id: str, model: str, tokens_in: int, tokens_out: int,
             ).fetchone()
             used = int(used_row["tokens_used"]) if used_row else 0
 
-            # Apply this model's free trial: input tokens first, then output tokens.
+            # Apply this model's free trial: input tokens first (uncached before
+            # cached, leaving the cheaper cached tokens as the billable part),
+            # then output tokens. This mirrors premium_worst_case_cost, which
+            # sizes the hold assuming no cache at all.
             remaining = max(limit - used, 0)
-            free_in = min(tokens_in, remaining)
-            remaining -= free_in
+            free_uncached = min(uncached_in, remaining)
+            remaining -= free_uncached
+            free_cached = min(tokens_cached, remaining)
+            remaining -= free_cached
             free_out = min(tokens_out, remaining)
-            paid_in = tokens_in - free_in
+            paid_cached = tokens_cached - free_cached
+            paid_in = (uncached_in - free_uncached) + paid_cached
             paid_out = tokens_out - free_out
-            trial_tokens = free_in + free_out
+            trial_tokens = free_uncached + free_cached + free_out
             paid_tokens = paid_in + paid_out
 
             # Theoretical cost of the billed (post-trial) tokens.
-            theoretical = premium_price(model, paid_in, paid_out)
+            theoretical = premium_price(model, paid_in, paid_out, tokens_cached=paid_cached)
+            # What the customer would have paid for those cached tokens at the
+            # full input rate: the discount the cache pass-through gave them.
+            cache_savings = round(
+                (paid_cached / 1_000_000.0)
+                * (premium_input_price(model) - premium_cached_input_price(model)),
+                12,
+            )
             if usage_source == "estimated":
                 # Unverifiable usage is never charged; it shows up as unbilled.
                 charge = 0.0
@@ -335,12 +361,13 @@ def record_usage(user_id: str, model: str, tokens_in: int, tokens_out: int,
         # Full per-request audit snapshot (written in the same transaction).
         cursor.execute("""
         INSERT INTO request_logs
-        (user_id, model, tokens_used, tokens_in, tokens_out, trial_tokens, paid_tokens,
-         cost_usd, unbilled_usd, is_premium, balance_after, usage_source, latency_ms, status_code)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (user_id, model, total_tokens, tokens_in, tokens_out, trial_tokens, paid_tokens,
-              charge, unbilled, 1 if is_premium else 0, balance_after, usage_source,
-              latency_ms, status_code))
+        (user_id, model, tokens_used, tokens_in, tokens_out, tokens_cached, trial_tokens, paid_tokens,
+         cost_usd, cache_savings_usd, upstream_cost_usd, unbilled_usd, is_premium, balance_after,
+         usage_source, latency_ms, status_code)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, model, total_tokens, tokens_in, tokens_out, tokens_cached, trial_tokens, paid_tokens,
+              charge, cache_savings, upstream_cost_usd, unbilled, 1 if is_premium else 0, balance_after,
+              usage_source, latency_ms, status_code))
 
     return charge
 

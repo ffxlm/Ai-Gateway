@@ -19,6 +19,7 @@ from app.services.payment_service import (
     record_payment_transaction, get_recent_payments,
 )
 from app.services.proxy_service import fetch_upstream_models
+from app.services.reconcile_service import reconcile as reconcile_upstream_margin
 
 TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -327,16 +328,18 @@ async def admin_requests_export(request: Request):
     writer = csv.writer(buf)
     writer.writerow([
         "time", "user_id", "username", "model", "premium",
-        "tokens_in", "tokens_out", "tokens_total", "trial_tokens", "paid_tokens",
-        "cost_usd", "unbilled_usd", "balance_after", "usage_source", "status_code", "latency_ms",
+        "tokens_in", "tokens_cached", "tokens_out", "tokens_total", "trial_tokens", "paid_tokens",
+        "cost_usd", "cache_savings_usd", "upstream_cost_usd", "unbilled_usd",
+        "balance_after", "usage_source", "status_code", "latency_ms",
     ])
     for r in rows:
         writer.writerow([
             r.get("created_at"), r.get("user_id"), r.get("username") or "", r.get("model"),
             1 if r.get("is_premium") else 0,
-            r.get("tokens_in"), r.get("tokens_out"), r.get("tokens_used"),
+            r.get("tokens_in"), r.get("tokens_cached"), r.get("tokens_out"), r.get("tokens_used"),
             r.get("trial_tokens"), r.get("paid_tokens"),
-            r.get("cost_usd"), r.get("unbilled_usd"), r.get("balance_after"), r.get("usage_source"),
+            r.get("cost_usd"), r.get("cache_savings_usd"), r.get("upstream_cost_usd"), r.get("unbilled_usd"),
+            r.get("balance_after"), r.get("usage_source"),
             r.get("status_code"), r.get("latency_ms"),
         ])
 
@@ -371,6 +374,20 @@ async def admin_analytics_api(request: Request, range: str = "24h"):
     if not user or user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Forbidden")
     data = get_portal_analytics(range)
+    return JSONResponse({"status": "ok", "data": data})
+
+
+@pages_router.get("/api/admin/reconcile")
+async def admin_reconcile_api(request: Request, days: int = 7):
+    """Read-only premium margin reconciliation (portal billed vs upstream spend).
+
+    Never changes billing; only reports. See ``reconcile_service`` for why this
+    is aggregate rather than per-request.
+    """
+    user = get_session_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    data = await reconcile_upstream_margin(days=days)
     return JSONResponse({"status": "ok", "data": data})
 
 

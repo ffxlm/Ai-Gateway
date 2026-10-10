@@ -383,6 +383,28 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Premium margin reconciliation: read-only, never changes billing. -->
+            <div class="mt-6 border-t border-zinc-800/80 pt-5" data-reconcile-root>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-200 flex items-center space-x-2">
+                            <i class="fa-solid fa-arrow-trend-up text-violet-400" aria-hidden="true"></i>
+                            <span>Premium Margin vs Upstream</span>
+                        </h3>
+                        <p class="text-xs text-zinc-400 mt-1">What customers paid versus what we paid the upstream. Read-only — it never changes billing.</p>
+                    </div>
+                    <div class="flex items-center space-x-2 shrink-0">
+                        <select data-reconcile-days class="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-200" aria-label="Reconciliation window">
+                            <option value="1">Today (UTC)</option>
+                            <option value="7" selected>Last 7 days</option>
+                            <option value="30">Last 30 days</option>
+                        </select>
+                        <button type="button" data-reconcile-run class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-semibold transition">Run reconciliation</button>
+                    </div>
+                </div>
+                <div data-reconcile-result class="mt-4 text-xs text-zinc-400">Idle. Run a reconciliation to compare billed revenue against upstream spend.</div>
+            </div>
         </div>
 
         <!-- Section: Recent Top-up Transactions -->

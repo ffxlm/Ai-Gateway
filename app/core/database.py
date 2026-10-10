@@ -182,9 +182,12 @@ def _migrate_observability(cursor):
     for column, ddl in (
         ("tokens_in", "INTEGER DEFAULT 0"),
         ("tokens_out", "INTEGER DEFAULT 0"),
+        ("tokens_cached", "INTEGER DEFAULT 0"),
         ("trial_tokens", "INTEGER DEFAULT 0"),
         ("paid_tokens", "INTEGER DEFAULT 0"),
         ("cost_usd", "REAL DEFAULT 0"),
+        ("cache_savings_usd", "REAL DEFAULT 0"),
+        ("upstream_cost_usd", "REAL DEFAULT 0"),
         ("unbilled_usd", "REAL DEFAULT 0"),
         ("is_premium", "INTEGER DEFAULT 0"),
         ("balance_after", "REAL DEFAULT 0"),

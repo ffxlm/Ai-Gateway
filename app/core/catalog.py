@@ -16,6 +16,13 @@ FREE_MODELS = [
     "MiniMax-M2.7",
 ]
 
+# Upstream (InferHub) bills a prompt-cache read at 10% of the normal input
+# rate. Measured from ``usage.cost`` on cb/deepseek-v4.1-flash, cb/gpt-6-sol and
+# cb/gpt-6-astra: the cached-input rate is 0.099–0.100x of the input ask. We
+# pass the *same* ratio through to customers, so the cache margin equals the
+# normal margin instead of being captured (or, if set too low, lost).
+CACHE_INPUT_RATIO = 0.10
+
 # Premium "xHigh" tier: billed per token from the user's USD wallet.
 #
 # Each model may declare its own ``trial_tokens_per_day`` free daily allowance.
@@ -38,6 +45,7 @@ PREMIUM_MODELS = [
         "provider": "DeepSeek",
         "tag": "Flagship Reasoning",
         "price_in_usd": 0.015,    # our price, per 1M input tokens
+        "price_cached_in_usd": 0.0015,  # our price for a cache-read input token (0.1x)
         "price_out_usd": 0.06,    # our price, per 1M output tokens
         "official_in_usd": 0.15,  # official list price, struck through on the card
         "official_out_usd": 0.60,
@@ -51,6 +59,7 @@ PREMIUM_MODELS = [
         "upstream_model": "cb/gpt-6-sol",
         "tag": "Frontier Agentic",
         "price_in_usd": 0.20,     # our price, per 1M input tokens
+        "price_cached_in_usd": 0.02,    # cache-read input (0.1x)
         "price_out_usd": 1.00,    # our price, per 1M output tokens
         "official_in_usd": 2.00,  # official list price, struck through on the card
         "official_out_usd": 10.00,
@@ -66,6 +75,7 @@ PREMIUM_MODELS = [
         "upstream_model": "cb/gpt-6-astra",
         "tag": "Frontier Reasoning",
         "price_in_usd": 1.00,     # our price, per 1M input tokens
+        "price_cached_in_usd": 0.10,    # cache-read input (0.1x)
         "price_out_usd": 5.00,    # our price, per 1M output tokens
         "official_in_usd": 10.00, # official list price, struck through on the card
         "official_out_usd": 50.00,
@@ -124,13 +134,43 @@ def premium_trial_setting_key(model_id: str) -> str:
     return f"premium_trial_tokens_per_day:{model_id}"
 
 
-def premium_price(model_id: str, tokens_in: int, tokens_out: int) -> float:
-    """USD cost for a premium request, or 0.0 for free/unknown models."""
+def premium_price(model_id: str, tokens_in: int, tokens_out: int,
+                  tokens_cached: int = 0) -> float:
+    """USD cost for a premium request, or 0.0 for free/unknown models.
+
+    ``tokens_in`` is the *total* prompt size (cache hits + misses) and
+    ``tokens_cached`` is the cache-read subset, billed at the model's cached
+    input rate. ``tokens_cached`` is clamped to ``tokens_in`` so a misbehaving
+    upstream cannot bill a negative uncached count.
+    """
     m = _PREMIUM_BY_ID.get(model_id)
     if not m:
         return 0.0
-    return (max(tokens_in, 0) / 1_000_000.0) * m["price_in_usd"] + \
-           (max(tokens_out, 0) / 1_000_000.0) * m["price_out_usd"]
+    tokens_in = max(int(tokens_in or 0), 0)
+    tokens_out = max(int(tokens_out or 0), 0)
+    tokens_cached = min(max(int(tokens_cached or 0), 0), tokens_in)
+    uncached_in = tokens_in - tokens_cached
+    cached_price = m.get("price_cached_in_usd")
+    if cached_price is None:
+        # No verified cache rate for this model: bill the full input rate so we
+        # can never sell cache below its cost.
+        cached_price = m["price_in_usd"]
+    return (uncached_in / 1_000_000.0) * m["price_in_usd"] + \
+           (tokens_cached / 1_000_000.0) * cached_price + \
+           (tokens_out / 1_000_000.0) * m["price_out_usd"]
+
+
+def premium_cached_input_price(model_id: str) -> float:
+    """USD per 1M cache-read input tokens.
+
+    Falls back to the full input rate when a model has no verified cache rate,
+    so an unconfigured model is never discounted below cost.
+    """
+    m = _PREMIUM_BY_ID.get(model_id)
+    if not m:
+        return 0.0
+    cached = m.get("price_cached_in_usd")
+    return float(m["price_in_usd"] if cached is None else cached)
 
 
 def premium_input_price(model_id: str) -> float:
@@ -212,6 +252,7 @@ def api_models() -> list:
             "tier": "xhigh",
             "pricing": {
                 "input_per_1m_usd": m["price_in_usd"],
+                "cached_input_per_1m_usd": premium_cached_input_price(m["id"]),
                 "output_per_1m_usd": m["price_out_usd"],
             },
         })

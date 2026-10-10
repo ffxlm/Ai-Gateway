@@ -23,6 +23,9 @@ class Settings:
     # May include or omit a trailing "/v1"; it is normalised when building URLs.
     PREMIUM_UPSTREAM_URL: str = os.getenv("PREMIUM_UPSTREAM_URL", "https://api.inferhub.dev/v1")
     PREMIUM_UPSTREAM_KEY: str = os.getenv("PREMIUM_UPSTREAM_KEY", "")
+    # Management/usage API of the same provider (NOT the inference endpoint).
+    # Used only by the read-only margin reconciliation; never on the request path.
+    PREMIUM_MANAGEMENT_URL: str = os.getenv("PREMIUM_MANAGEMENT_URL", "https://inferhub.dev/api")
     
     # Discord OAuth2
     DISCORD_CLIENT_ID: str = os.getenv("DISCORD_CLIENT_ID", "")
