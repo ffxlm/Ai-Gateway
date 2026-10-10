@@ -102,6 +102,23 @@ class PortalUITests(unittest.TestCase):
             for field in ['price_in_usd', 'price_out_usd', 'price_cached_in_usd']:
                 self.assertIn(f'<strong>${model[field]:g}</strong>', premium)
 
+    def test_landing_identifies_discord_before_sign_in(self):
+        self.mock("get_session_user", return_value=None)
+        html = self.client.get('/login').text
+        nav = html.split('<nav class="site-nav', 1)[1].split('</nav>', 1)[0]
+        self.assertIn('aria-label="Sign in with Discord"', nav)
+        self.assertIn('class="discord-signin-detail"> with Discord', nav)
+        self.assertIn('href="/auth/discord/login"', nav)
+        self.assertIn('src="/static/discord.svg"', nav)
+        self.assertIn('aria-describedby="hero-signin-help"', html)
+        self.assertIn('id="hero-signin-help"', html)
+        self.assertIn('เข้าสู่ระบบด้วย Discord', html)
+        icon = self.client.get('/static/discord.svg')
+        self.assertEqual(icon.status_code, 200)
+        svg = ET.fromstring(icon.content)
+        self.assertTrue(svg.findall('{http://www.w3.org/2000/svg}path'))
+        self.assertIn('CC BY 4.0', icon.text)
+
     def test_public_preview_uses_current_console_palette(self):
         self.mock("get_session_user", return_value=None)
         self.assertIn('/static/product-preview.css?v=4', self.client.get('/login').text)
