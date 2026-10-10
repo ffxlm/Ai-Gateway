@@ -183,8 +183,11 @@ class PortalUITests(unittest.TestCase):
         self.assertIn("classList.add('console-booting')", admin_response.text)
         self.assertIn("data-reconcile-root", admin_response.text)
         self.assertIn("data-reconcile-run", admin_response.text)
+        self.assertIn("data-reconcile-epoch", admin_response.text)
+        self.assertIn("data-reconcile-epoch-note", admin_response.text)
         # The endpoint is fetched from the console script, not inlined in the page.
         self.assertIn("/api/admin/reconcile", self.client.get("/static/console.js").text)
+        self.assertIn("/api/admin/metrics-epoch", self.client.get("/static/console.js").text)
         self.assert_no_redundant_navigation(admin_response.text)
         for heading in ["Wallet &amp; top-ups", "Daily free-trial allowances", "Concurrency limits",
                         "API connections &amp; support", "Payment verification"]:

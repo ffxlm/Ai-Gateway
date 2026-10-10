@@ -2,38 +2,56 @@
 
 This module deliberately does **not** touch customer billing. It answers one
 operational question: *did premium traffic make money, and did we capture every
-request we paid for?* It compares three numbers for a date window:
+request we paid for?* It reports three numbers for a date window:
 
   1. ``billed_usd``            -- what the portal charged customers for premium
                                   models (``Σ request_logs.cost_usd``).
   2. ``observed_upstream_usd`` -- what the portal *saw* the upstream charge, per
-                                  response (``Σ request_logs.upstream_cost_usd``).
+                                  response (``Σ request_logs.upstream_cost_usd``,
+                                  taken from the provider's own ``usage.cost``).
   3. ``upstream_cost_usdc``    -- what the upstream account actually spent
                                   (InferHub ``/api/usage/logs`` totals).
 
-Gross margin is (1) - (3). The gap between (2) and (3) is the important signal:
-if the upstream spent materially more than we observed, usage was billed to us
-that the portal never saw -- estimated streams, or the upstream key being used
-outside the portal. Neither is fixed by charging customers after the fact (that
-cannot be matched to a request reliably); it is surfaced here for an operator to
-act on at the source.
+Two margins are reported, because they answer different questions:
+
+  * **business margin** (``billed_usd - total_cost_usd``) is the honest one: it
+    prices every request we can measure against the provider's own reported
+    cost, so it stays correct even when the upstream account is shared with
+    other tools. This is the number to trust for "are we making money?".
+  * **gross margin vs account** (``billed_usd - upstream_cost_usdc``) compares
+    our revenue against the *whole account's* spend. The gap between the
+    observed cost and the account spend is the leak signal: usage billed to the
+    account that the portal never saw (a shared key, or estimated streams).
+
+**Fresh measurement epoch.** The provider only started returning per-request
+``usage.cost`` recently, so every request logged before that point carries a
+``upstream_cost_usd`` of 0 and cannot be measured. Rather than let that old data
+drag the numbers down, an operator can set a ``metrics_epoch_start``: the
+business figures then count only requests at/after that instant. Old rows are
+left untouched (they are still the customer's billing history); they are simply
+excluded from the *margin* measurement.
 
 Reconciliation only makes sense for premium models: free models route through a
 different bridge (9Router), not this provider's account.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 import httpx
 
 from app.core.config import settings
-from app.core.database import db_session, get_setting
+from app.core.database import db_session, get_setting, update_setting
 
 # The upstream usage API returns amounts as decimal strings; treat them as
 # opaque and parse defensively.
 _HTTP_TIMEOUT = 20.0
+
+# Local wall-clock format used by ``request_logs.created_at`` (SQLite
+# ``datetime('now','localtime')``), so the epoch can be compared as text.
+_TS_FORMAT = "%Y-%m-%d %H:%M:%S"
+_EPOCH_SETTING = "metrics_epoch_start"
 
 
 def _management_base() -> str:
@@ -61,16 +79,55 @@ def _to_local_naive(dt_utc: datetime) -> datetime:
         return dt_utc.replace(tzinfo=None)
 
 
-def portal_premium_totals(from_utc: datetime, to_utc: datetime) -> Dict[str, Any]:
+def _now_local_str() -> str:
+    return datetime.now(ZoneInfo(settings.TIMEZONE)).replace(tzinfo=None).strftime(_TS_FORMAT)
+
+
+# --------------------------------------------------------------------------- #
+# Fresh-measurement epoch
+# --------------------------------------------------------------------------- #
+
+def metrics_epoch() -> Optional[str]:
+    """The stored measurement epoch (local ``YYYY-MM-DD HH:MM:SS``), or None."""
+    raw = (get_setting(_EPOCH_SETTING, "") or "").strip()
+    return raw or None
+
+
+def set_metrics_epoch(value: Optional[str]) -> Optional[str]:
+    """Persist (or clear) the measurement epoch. Returns the stored value."""
+    clean = (value or "").strip()
+    update_setting(_EPOCH_SETTING, clean)
+    return clean or None
+
+
+def start_fresh_epoch() -> str:
+    """Start a fresh measurement window at the current local time."""
+    now = _now_local_str()
+    set_metrics_epoch(now)
+    return now
+
+
+# --------------------------------------------------------------------------- #
+# Portal side
+# --------------------------------------------------------------------------- #
+
+def portal_premium_totals(from_utc: datetime, to_utc: datetime,
+                          epoch_local: Optional[str] = None) -> Dict[str, Any]:
     """Aggregate the portal's own premium request logs for a UTC window.
 
     ``request_logs.created_at`` is stored in the business timezone, so the UTC
-    bounds are converted to local wall-clock before the comparison.
+    bounds are converted to local wall-clock before the comparison. When
+    ``epoch_local`` is set, the window's lower bound is raised to it, so only
+    requests from the fresh measurement point onward are counted.
     """
-    local_from = _to_local_naive(from_utc).strftime("%Y-%m-%d %H:%M:%S")
-    local_to = _to_local_naive(to_utc).strftime("%Y-%m-%d %H:%M:%S")
+    local_from = _to_local_naive(from_utc).strftime(_TS_FORMAT)
+    local_to = _to_local_naive(to_utc).strftime(_TS_FORMAT)
+    if epoch_local and epoch_local > local_from:
+        local_from = epoch_local
+
     with db_session() as conn:
-        row = conn.cursor().execute(
+        cursor = conn.cursor()
+        row = cursor.execute(
             """
             SELECT
                 COUNT(*) AS requests,
@@ -80,23 +137,79 @@ def portal_premium_totals(from_utc: datetime, to_utc: datetime) -> Dict[str, Any
                 COALESCE(SUM(tokens_out), 0) AS tokens_out,
                 COALESCE(SUM(tokens_cached), 0) AS tokens_cached,
                 COALESCE(SUM(CASE WHEN usage_source = 'estimated' THEN 1 ELSE 0 END), 0) AS estimated_requests,
-                COALESCE(SUM(unbilled_usd), 0) AS unbilled_usd
+                COALESCE(SUM(unbilled_usd), 0) AS unbilled_usd,
+                -- Split the *measured* upstream cost into the part earned on
+                -- paid tokens and the part given away as free trial, in
+                -- proportion to the tokens on each side of the request.
+                COALESCE(SUM(CASE WHEN (trial_tokens + paid_tokens) > 0
+                    THEN upstream_cost_usd * paid_tokens * 1.0 / (trial_tokens + paid_tokens)
+                    ELSE upstream_cost_usd END), 0) AS paid_cost_usd,
+                COALESCE(SUM(CASE WHEN (trial_tokens + paid_tokens) > 0
+                    THEN upstream_cost_usd * trial_tokens * 1.0 / (trial_tokens + paid_tokens)
+                    ELSE 0 END), 0) AS trial_cost_usd
             FROM request_logs
             WHERE is_premium = 1 AND created_at >= ? AND created_at < ?
             """,
             (local_from, local_to),
         ).fetchone()
+
+        # Fallback for estimated requests (the upstream never reported usage, so
+        # their cost is 0). Price their tokens at the measured average cost per
+        # token of the same model, so an unverifiable request still shows a cost
+        # instead of silently looking free.
+        measured = {
+            r["model"]: (float(r["cost"] or 0), int(r["tokens"] or 0))
+            for r in cursor.execute(
+                """
+                SELECT model,
+                       COALESCE(SUM(upstream_cost_usd), 0) AS cost,
+                       COALESCE(SUM(tokens_used), 0) AS tokens
+                FROM request_logs
+                WHERE is_premium = 1 AND created_at >= ? AND created_at < ?
+                      AND upstream_cost_usd > 0 AND tokens_used > 0
+                GROUP BY model
+                """,
+                (local_from, local_to),
+            ).fetchall()
+        }
+        estimated_cost = 0.0
+        for r in cursor.execute(
+            """
+            SELECT model, COALESCE(SUM(tokens_used), 0) AS tokens
+            FROM request_logs
+            WHERE is_premium = 1 AND created_at >= ? AND created_at < ?
+                  AND usage_source = 'estimated'
+            GROUP BY model
+            """,
+            (local_from, local_to),
+        ).fetchall():
+            cost, tokens = measured.get(r["model"], (0.0, 0))
+            if tokens > 0 and cost > 0:
+                estimated_cost += int(r["tokens"] or 0) * (cost / tokens)
+
+    observed = round(float(row["observed_upstream_usd"] or 0), 8)
     return {
         "requests": int(row["requests"] or 0),
         "billed_usd": round(float(row["billed_usd"] or 0), 8),
-        "observed_upstream_usd": round(float(row["observed_upstream_usd"] or 0), 8),
+        "observed_upstream_usd": observed,
+        "measured_cost_usd": observed,
+        "estimated_cost_usd": round(estimated_cost, 8),
+        "total_cost_usd": round(observed + estimated_cost, 8),
+        "paid_cost_usd": round(float(row["paid_cost_usd"] or 0), 8),
+        "trial_cost_usd": round(float(row["trial_cost_usd"] or 0), 8),
         "tokens_in": int(row["tokens_in"] or 0),
         "tokens_out": int(row["tokens_out"] or 0),
         "tokens_cached": int(row["tokens_cached"] or 0),
         "estimated_requests": int(row["estimated_requests"] or 0),
         "unbilled_usd": round(float(row["unbilled_usd"] or 0), 8),
+        "from_local": local_from,
+        "to_local": local_to,
     }
 
+
+# --------------------------------------------------------------------------- #
+# Upstream side
+# --------------------------------------------------------------------------- #
 
 async def fetch_upstream_totals(from_utc: datetime, to_utc: datetime) -> Dict[str, Any]:
     """Fetch the upstream account's own usage totals for the same UTC window.
@@ -133,10 +246,34 @@ async def fetch_upstream_totals(from_utc: datetime, to_utc: datetime) -> Dict[st
     }
 
 
+# --------------------------------------------------------------------------- #
+# Reconcile
+# --------------------------------------------------------------------------- #
+
+def _business_margin(billed: float, portal: Dict[str, Any]) -> Dict[str, Any]:
+    """Self-measured business margin: revenue minus every cost we can measure.
+
+    Uses the provider's own reported cost per request (plus the estimated
+    fallback), so it is unaffected by other consumers of a shared upstream key.
+    """
+    measured = float(portal["total_cost_usd"] or 0)
+    paid_cost = float(portal["paid_cost_usd"] or 0)
+    return {
+        "measured_cost_usd": round(measured, 8),
+        "business_gross_usd": round(billed - measured, 8),
+        "business_ratio": round(billed / measured, 3) if measured > 0 else None,
+        "paid_cost_usd": round(paid_cost, 8),
+        "paid_gross_usd": round(billed - paid_cost, 8),
+        "paid_ratio": round(billed / paid_cost, 3) if paid_cost > 0 else None,
+        "trial_cost_usd": round(float(portal["trial_cost_usd"] or 0), 8),
+    }
+
+
 async def reconcile(days: int = 7) -> Dict[str, Any]:
     """Compare portal premium billing against upstream spend for a window."""
     from_utc, to_utc = _utc_day_bounds(days)
-    portal = portal_premium_totals(from_utc, to_utc)
+    epoch = metrics_epoch()
+    portal = portal_premium_totals(from_utc, to_utc, epoch_local=epoch)
 
     upstream: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
@@ -149,6 +286,12 @@ async def reconcile(days: int = 7) -> Dict[str, Any]:
         "days": int(days),
         "from_utc": from_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "to_utc": to_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "measurement": {
+            "epoch": epoch,
+            "measuring_fresh": bool(epoch),
+            "effective_from_local": portal["from_local"],
+            "effective_to_local": portal["to_local"],
+        },
         "portal": portal,
         "upstream": upstream,
         "upstream_error": error,
@@ -157,9 +300,12 @@ async def reconcile(days: int = 7) -> Dict[str, Any]:
     if upstream is not None:
         paid = upstream["cost_usdc"]
         billed = portal["billed_usd"]
-        result["margin"] = {
+        margin: Dict[str, Any] = {
+            # vs the whole upstream account (cross-check / leak detector)
             "gross_usd": round(billed - paid, 8),
             "ratio": round(billed / paid, 3) if paid > 0 else None,
             "observed_vs_upstream_gap_usd": round(portal["observed_upstream_usd"] - paid, 8),
         }
+        margin.update(_business_margin(billed, portal))
+        result["margin"] = margin
     return result

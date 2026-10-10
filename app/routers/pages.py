@@ -19,7 +19,12 @@ from app.services.payment_service import (
     record_payment_transaction, get_recent_payments,
 )
 from app.services.proxy_service import fetch_upstream_models
-from app.services.reconcile_service import reconcile as reconcile_upstream_margin
+from app.services.reconcile_service import (
+    reconcile as reconcile_upstream_margin,
+    metrics_epoch as get_metrics_epoch,
+    set_metrics_epoch,
+    start_fresh_epoch,
+)
 
 TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -267,6 +272,7 @@ async def admin_page(request: Request):
         "wallet_tx": wallet_tx,
         "analytics": portal_analytics,
         "reconciliation": reconciliation,
+        "metrics_epoch": get_metrics_epoch(),
     })
 
 
@@ -389,6 +395,30 @@ async def admin_reconcile_api(request: Request, days: int = 7):
         raise HTTPException(status_code=403, detail="Forbidden")
     data = await reconcile_upstream_margin(days=days)
     return JSONResponse({"status": "ok", "data": data})
+
+
+@pages_router.post("/api/admin/metrics-epoch")
+async def admin_metrics_epoch(request: Request):
+    """Start a fresh margin-measurement window, or clear it.
+
+    Old request rows are never deleted; this only moves the lower bound used by
+    the reconciliation so the (unmeasurable) pre-upgrade history stops dragging
+    the business margin down. See ``reconcile_service`` for the rationale.
+    """
+    user = get_session_user(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    action = str((body or {}).get("action", "start")).strip().lower()
+    if action == "clear":
+        epoch = set_metrics_epoch(None)
+    else:
+        epoch = start_fresh_epoch()
+    return JSONResponse({"status": "ok", "epoch": epoch})
+
 
 
 @pages_router.post("/api/admin/adjust-balance")

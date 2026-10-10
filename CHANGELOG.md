@@ -5,6 +5,24 @@ Newest entries on top. Keep it short — facts, not prose.
 
 ## 2026-10-10
 
+- [done] Added a **fresh measurement epoch** + honest business margin to the
+  reconciliation. The provider only started returning per-request `usage.cost`
+  recently, so every older row has `upstream_cost_usd = 0` and cannot be
+  measured. New setting `metrics_epoch_start`: when set, the business figures
+  count only requests at/after that instant; old rows are kept (customer billing
+  history) but excluded from the *margin*. Admin API `POST /api/admin/metrics-epoch`
+  (`{"action":"start"|"clear"}`) + a "Start measuring fresh" button on the
+  reconcile card. The card now shows **Cost (measured)** and **Business margin**
+  (`billed − measured cost`, self-measured so a shared upstream key no longer
+  skews it), plus **Paid margin** / **Trial cost (free)** (the measured cost split
+  in proportion to paid vs trial tokens) and the account **cross-check** as the
+  leak signal.
+- [done] Estimated requests (upstream never reported usage) are now priced at the
+  measured average cost per token of the same model, so an unverifiable request
+  still shows a cost instead of silently looking free.
+- [note] Live E2E: a real premium call recorded `upstream_cost_usd = 1e-05`;
+  with an epoch set just before it, reconcile counted 1 request, split it as
+  trial cost (paid 0), and reported business margin from the measured cost.
 - [done] Added **read-only premium margin reconciliation** (`app/services/reconcile_service.py`,
   admin API `GET /api/admin/reconcile?days=N`, card in Admin → Reconciliation).
   It compares three numbers for a UTC day window: portal billed

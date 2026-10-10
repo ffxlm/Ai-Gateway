@@ -463,17 +463,20 @@ class ReconcileTests(unittest.TestCase):
         init_db()
 
     def _seed_log(self, billed, observed_upstream, tokens_in=1000, tokens_out=100,
-                  cached=0, estimated=False, is_premium=1):
+                  cached=0, estimated=False, is_premium=1, trial=0, paid=0,
+                  created_at=None):
         conn = sqlite3.connect(self.db_path)
         try:
             conn.execute(
                 "INSERT INTO request_logs "
                 "(user_id, model, tokens_used, tokens_in, tokens_out, tokens_cached, "
-                " cost_usd, upstream_cost_usd, is_premium, usage_source) "
-                "VALUES ('u-hex', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " trial_tokens, paid_tokens, cost_usd, upstream_cost_usd, is_premium, "
+                " usage_source, created_at) "
+                "VALUES ('u-hex', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+                " COALESCE(?, datetime('now','localtime')))",
                 (DEEPSEEK, tokens_in + tokens_out, tokens_in, tokens_out, cached,
-                 billed, observed_upstream, is_premium,
-                 "estimated" if estimated else "upstream"),
+                 trial, paid, billed, observed_upstream, is_premium,
+                 "estimated" if estimated else "upstream", created_at),
             )
             conn.commit()
         finally:
@@ -546,6 +549,104 @@ class ReconcileTests(unittest.TestCase):
             self.assertEqual(body["status"], "ok")
             self.assertIn("portal", body["data"])
             self.assertIn("upstream", body["data"])
+
+    def test_business_margin_splits_paid_and_trial_cost(self):
+        from app.services import reconcile_service
+        # One fully paid request (0.008 billed, 0.002 upstream) ...
+        self._seed_log(0.008, 0.002, trial=0, paid=1000)
+        # ... and one fully free (trial) request (0 billed, 0.001 upstream).
+        self._seed_log(0.0, 0.001, trial=1000, paid=0)
+
+        _FakeReconcileClient.payload = {
+            "rangeTotal": 2, "totalCostUsdc": "0.003000",
+            "totalTokens": 2200, "totalSavedUsdc": "0",
+        }
+        with patch.object(reconcile_service.httpx, "AsyncClient", _FakeReconcileClient), \
+             patch.object(config_module.settings, "PREMIUM_MANAGEMENT_URL", "https://example.test/api"), \
+             patch.object(config_module.settings, "PREMIUM_UPSTREAM_KEY", "sk-test"):
+            import asyncio
+            data = asyncio.run(reconcile_service.reconcile(days=7))
+
+        p = data["portal"]
+        # The measured upstream cost splits cleanly by which tokens were paid.
+        self.assertAlmostEqual(p["paid_cost_usd"], 0.002, places=9)
+        self.assertAlmostEqual(p["trial_cost_usd"], 0.001, places=9)
+        self.assertAlmostEqual(p["total_cost_usd"], 0.003, places=9)
+        m = data["margin"]
+        # Business margin charges the free-trial cost against revenue too.
+        self.assertAlmostEqual(m["business_gross_usd"], 0.008 - 0.003, places=9)
+        self.assertAlmostEqual(m["paid_gross_usd"], 0.008 - 0.002, places=9)
+        self.assertAlmostEqual(m["trial_cost_usd"], 0.001, places=9)
+
+    def test_estimated_request_is_priced_at_the_measured_average(self):
+        from app.services import reconcile_service
+        # Measured: 0.002 for 2000 tokens -> 0.000001 per token.
+        self._seed_log(0.0, 0.002, tokens_in=2000, tokens_out=0, trial=2000, paid=0)
+        # Estimated: 1000 tokens with no reported cost -> priced at the average.
+        self._seed_log(0.0, 0.0, tokens_in=1000, tokens_out=0, estimated=True, trial=1000, paid=0)
+
+        _FakeReconcileClient.payload = {
+            "rangeTotal": 1, "totalCostUsdc": "0.002000",
+            "totalTokens": 2000, "totalSavedUsdc": "0",
+        }
+        with patch.object(reconcile_service.httpx, "AsyncClient", _FakeReconcileClient), \
+             patch.object(config_module.settings, "PREMIUM_MANAGEMENT_URL", "https://example.test/api"), \
+             patch.object(config_module.settings, "PREMIUM_UPSTREAM_KEY", "sk-test"):
+            import asyncio
+            data = asyncio.run(reconcile_service.reconcile(days=7))
+
+        p = data["portal"]
+        self.assertAlmostEqual(p["measured_cost_usd"], 0.002, places=9)
+        self.assertAlmostEqual(p["estimated_cost_usd"], 0.001, places=9)
+        self.assertAlmostEqual(p["total_cost_usd"], 0.003, places=9)
+
+    def test_metrics_epoch_excludes_older_requests(self):
+        from app.services import reconcile_service
+        # An old request (before the epoch) and a fresh one.
+        self._seed_log(0.5, 0.2, trial=0, paid=1000, created_at="2026-10-01 00:00:00")
+        self._seed_log(0.008, 0.002, trial=0, paid=1000, created_at="2026-10-10 14:00:00")
+
+        reconcile_service.set_metrics_epoch("2026-10-10 13:00:00")
+        try:
+            _FakeReconcileClient.payload = {
+                "rangeTotal": 1, "totalCostUsdc": "0.002000",
+                "totalTokens": 1000, "totalSavedUsdc": "0",
+            }
+            with patch.object(reconcile_service.httpx, "AsyncClient", _FakeReconcileClient), \
+                 patch.object(config_module.settings, "PREMIUM_MANAGEMENT_URL", "https://example.test/api"), \
+                 patch.object(config_module.settings, "PREMIUM_UPSTREAM_KEY", "sk-test"):
+                import asyncio
+                data = asyncio.run(reconcile_service.reconcile(days=30))
+        finally:
+            reconcile_service.set_metrics_epoch(None)
+
+        # Only the request at/after the epoch is measured; the old row is kept
+        # in the table but excluded from the margin.
+        self.assertEqual(data["portal"]["requests"], 1)
+        self.assertAlmostEqual(data["portal"]["billed_usd"], 0.008, places=9)
+        self.assertTrue(data["measurement"]["measuring_fresh"])
+        self.assertEqual(data["measurement"]["epoch"], "2026-10-10 13:00:00")
+
+    def test_metrics_epoch_endpoint_requires_admin_and_sets_epoch(self):
+        from app.main import app
+        from app.services import reconcile_service
+        client = self.stack.enter_context(TestClient(app))
+
+        with patch("app.routers.pages.get_session_user", return_value={"role": "user"}):
+            denied = client.post("/api/admin/metrics-epoch", json={"action": "start"})
+        self.assertEqual(denied.status_code, 403)
+
+        with patch("app.routers.pages.get_session_user", return_value={"role": "admin"}):
+            ok = client.post("/api/admin/metrics-epoch", json={"action": "start"})
+        self.assertEqual(ok.status_code, 200)
+        epoch = ok.json()["epoch"]
+        self.assertTrue(epoch)
+        self.assertEqual(reconcile_service.metrics_epoch(), epoch)
+
+        with patch("app.routers.pages.get_session_user", return_value={"role": "admin"}):
+            cleared = client.post("/api/admin/metrics-epoch", json={"action": "clear"})
+        self.assertIsNone(cleared.json()["epoch"])
+        self.assertIsNone(reconcile_service.metrics_epoch())
 
 
 if __name__ == "__main__":
