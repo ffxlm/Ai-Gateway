@@ -424,6 +424,7 @@ class _FakeReconcileClient:
     """Stands in for httpx.AsyncClient used by the reconciliation service."""
 
     payload = {}
+    me_payload = {}
     status = 200
 
     def __init__(self, *args, **kwargs):
@@ -446,7 +447,7 @@ class _FakeReconcileClient:
                     raise RuntimeError(f"HTTP {outer.status}")
 
             def json(self):
-                return outer.payload
+                return outer.me_payload if str(url).endswith("/me") else outer.payload
 
         return _Resp()
 
@@ -653,6 +654,49 @@ class ReconcileTests(unittest.TestCase):
             cleared = client.post("/api/admin/metrics-epoch", json={"action": "clear"})
         self.assertIsNone(cleared.json()["epoch"])
         self.assertIsNone(reconcile_service.metrics_epoch())
+
+    def test_upstream_account_balance_is_surfaced(self):
+        from app.services import reconcile_service
+        _FakeReconcileClient.payload = {
+            "rangeTotal": 0, "totalCostUsdc": "0", "totalTokens": 0, "totalSavedUsdc": "0",
+        }
+        _FakeReconcileClient.me_payload = {
+            "email": "film01.thirx@gmail.com", "displayName": "ffxlm", "status": "active",
+            "balances": {"consumer_balance": "0.415939", "fiat_pendings": "0.854618"},
+        }
+        with patch.object(reconcile_service.httpx, "AsyncClient", _FakeReconcileClient), \
+             patch.object(config_module.settings, "PREMIUM_MANAGEMENT_URL", "https://example.test/api"), \
+             patch.object(config_module.settings, "PREMIUM_UPSTREAM_KEY", "sk-test"):
+            import asyncio
+            data = asyncio.run(reconcile_service.reconcile(days=1))
+
+        self.assertEqual(data["account"]["balance_usdc"], 0.415939)
+        self.assertEqual(data["account"]["fiat_pending_usdc"], 0.854618)
+        self.assertEqual(data["account"]["status"], "active")
+        self.assertIsNone(data["account_error"])
+
+    def test_upstream_account_failure_is_reported_not_fatal(self):
+        from app.services import reconcile_service
+        _FakeReconcileClient.payload = {
+            "rangeTotal": 0, "totalCostUsdc": "0", "totalTokens": 0, "totalSavedUsdc": "0",
+        }
+        _FakeReconcileClient.status = 500
+        try:
+            with patch.object(reconcile_service.httpx, "AsyncClient", _FakeReconcileClient), \
+                 patch.object(config_module.settings, "PREMIUM_MANAGEMENT_URL", "https://example.test/api"), \
+                 patch.object(config_module.settings, "PREMIUM_UPSTREAM_KEY", "sk-test"):
+                import asyncio
+                data = asyncio.run(reconcile_service.reconcile(days=1))
+        finally:
+            _FakeReconcileClient.status = 200
+
+        # A failing upstream must not break the portal side, which is the part
+        # that must never be wrong.
+        self.assertIsNone(data["account"])
+        self.assertTrue(data["account_error"])
+        self.assertIsNone(data["upstream"])
+        self.assertTrue(data["upstream_error"])
+        self.assertIn("portal", data)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,13 @@ Newest entries on top. Keep it short — facts, not prose.
 
 ## 2026-10-10
 
+- [done] Show the **InferHub account balance** on the reconcile card. The
+  reconcile now also calls `GET /api/me` (same management API/key) and returns
+  `account` (`balance_usdc`, `fiat_pending_usdc`, `email`, `status`) plus
+  `account_error`. Both upstream calls run concurrently and each failure is
+  reported, never raised, so the portal side is always returned. The card shows
+  "InferHub balance: $X · pending $Y" (fetched when you press Run reconciliation).
+  Bumped `console.js` cache-buster (`?v=10` → `?v=11`).
 - [done] Clarified the reconcile **cross-check** line: it is labelled "whole
   account (all keys · full window, not just the portal)" and the card now warns
   when the measurement epoch clips the window start (`epoch_after_window_start`),

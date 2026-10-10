@@ -35,6 +35,7 @@ Reconciliation only makes sense for premium models: free models route through a
 different bridge (9Router), not this provider's account.
 """
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
@@ -248,6 +249,40 @@ async def fetch_upstream_totals(from_utc: datetime, to_utc: datetime) -> Dict[st
     }
 
 
+async def fetch_upstream_account() -> Dict[str, Any]:
+    """Fetch the upstream account's identity and current balance.
+
+    ``consumer_balance`` is spendable credit; ``fiat_pendings`` is money that has
+    been funded but not yet credited. Surfacing it lets an operator see the
+    account running dry *before* premium requests start failing. Raises on
+    failure so the caller can show "unavailable" rather than a stale zero.
+    """
+    base = _management_base()
+    key = get_setting("premium_upstream_key", settings.PREMIUM_UPSTREAM_KEY)
+    if not base or not key:
+        raise ValueError("premium management URL/key not configured")
+
+    async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+        resp = await client.get(f"{base}/me", headers={"Authorization": f"Bearer {key}"})
+        resp.raise_for_status()
+        data = resp.json()
+
+    def _num(value) -> float:
+        try:
+            return float(value or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    balances = data.get("balances") or {}
+    return {
+        "email": data.get("email"),
+        "display_name": data.get("displayName"),
+        "status": data.get("status"),
+        "balance_usdc": round(_num(balances.get("consumer_balance")), 8),
+        "fiat_pending_usdc": round(_num(balances.get("fiat_pendings")), 8),
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Reconcile
 # --------------------------------------------------------------------------- #
@@ -277,12 +312,19 @@ async def reconcile(days: int = 7) -> Dict[str, Any]:
     epoch = metrics_epoch()
     portal = portal_premium_totals(from_utc, to_utc, epoch_local=epoch)
 
-    upstream: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    try:
-        upstream = await fetch_upstream_totals(from_utc, to_utc)
-    except Exception as exc:  # network/config failure: still return the portal side
-        error = str(exc)
+    # Both live on the same management API; fetch them together. Each is
+    # optional: a failure is reported, never raised, so the portal side (which
+    # is the part that must never be wrong) is always returned.
+    async def _safe(coro):
+        try:
+            return await coro, None
+        except Exception as exc:  # network/config failure
+            return None, str(exc)
+
+    (upstream, error), (account, account_error) = await asyncio.gather(
+        _safe(fetch_upstream_totals(from_utc, to_utc)),
+        _safe(fetch_upstream_account()),
+    )
 
     result: Dict[str, Any] = {
         "days": int(days),
@@ -302,6 +344,8 @@ async def reconcile(days: int = 7) -> Dict[str, Any]:
         "portal": portal,
         "upstream": upstream,
         "upstream_error": error,
+        "account": account,
+        "account_error": account_error,
     }
 
     if upstream is not None:

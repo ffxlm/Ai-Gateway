@@ -210,6 +210,14 @@
                 cells.push(cell('Business margin', '—', 'text-zinc-500'));
             }
             const notes = [];
+            if (d.account) {
+                const pending = d.account.fiat_pending_usdc > 0
+                    ? ` · <span class="text-zinc-500">pending</span> <span class="font-mono text-zinc-300">${usd(d.account.fiat_pending_usdc)}</span>`
+                    : '';
+                notes.push(`InferHub balance: <span class="font-mono text-emerald-400">${usd(d.account.balance_usdc)}</span>${pending}`);
+            } else if (d.account_error) {
+                notes.push(`<span class="text-zinc-500">InferHub balance unavailable: ${esc(d.account_error)}</span>`);
+            }
             notes.push(`Paid margin: <span class="font-mono text-zinc-300">${usd(m.paid_gross_usd || 0)}</span> · Trial cost (free): <span class="font-mono text-zinc-300">${usd(m.trial_cost_usd || 0)}</span>`);
             notes.push(`Portal premium requests: <span class="font-mono text-zinc-300">${p.requests}</span> · tokens in/out/cached: <span class="font-mono text-zinc-300">${p.tokens_in}/${p.tokens_out}/${p.tokens_cached}</span>`);
             if (d.upstream) {
