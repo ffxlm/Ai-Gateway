@@ -15,6 +15,13 @@ from app.routers.pages import pages_router
 # How often the reservation janitor retires holds from crashed requests.
 RESERVATION_SWEEP_SECONDS = 60
 
+# Static asset cache policy. Files requested with a version query (e.g.
+# /static/portal.css?v=2) are content-addressed by that query, so they can be
+# cached forever; unversioned assets (favicon, icons) get a short TTL so that
+# updates still propagate to browsers within a day.
+IMMUTABLE_MAX_AGE = 31536000  # 1 year
+DEFAULT_MAX_AGE = 86400       # 1 day
+
 
 async def _reservation_janitor() -> None:
     """Periodically expire wallet holds whose request never settled.
@@ -62,6 +69,18 @@ app.add_middleware(
 
 # Register Sub-Routers
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+
+
+@app.middleware("http")
+async def static_cache_headers(request, call_next):
+    """Attach Cache-Control to static assets so browsers reuse them."""
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        if "v" in request.query_params:
+            response.headers["Cache-Control"] = f"public, max-age={IMMUTABLE_MAX_AGE}, immutable"
+        else:
+            response.headers["Cache-Control"] = f"public, max-age={DEFAULT_MAX_AGE}"
+    return response
 app.include_router(gateway_router)
 app.include_router(auth_router)
 app.include_router(pages_router)
