@@ -230,3 +230,22 @@
     .margin-details-body, .margin-settings-body { padding: 18px; }.margin-breakdown { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion:reduce) { .margin-refresh .fa-spin { animation: none; } }
+
+/* Keep input, output and cache prices together, with the same visual weight. */
+.console-model-row.premium-model-item { grid-template-columns: minmax(0,1fr) 280px 190px 34px; }
+.console-model-pricing.premium-rates { display: block; }
+.console-model-pricing.premium-rates .model-rate-cell > strong { font-size: 15px; }
+.console-model-pricing.premium-rates .price-reference { margin: 0; line-height: 14px; }
+@media (max-width:1180px) {
+    .console-model-row.premium-model-item { grid-template-columns: minmax(0,1fr) 150px 30px; gap: 20px; }
+    .premium-model-item .console-model-identity { grid-column: 1; grid-row: 1; }
+    .premium-model-item .console-trial { grid-column: 2; grid-row: 1; }
+    .premium-model-item > .console-icon-button { grid-column: 3; grid-row: 1; }
+    .premium-model-item .premium-rates { grid-column: 1 / -1; grid-row: 2; }
+}
+@media (max-width:620px) {
+    .console-model-row.premium-model-item { grid-template-columns: minmax(0,1fr) 34px; gap: 20px; padding: 20px 18px; }
+    .premium-model-item > .console-icon-button { grid-column: 2; }
+    .premium-model-item .console-trial { grid-column: 1 / -1; grid-row: 3; }
+    .console-model-pricing.premium-rates .model-rate-cell { padding: 13px 10px; }
+}

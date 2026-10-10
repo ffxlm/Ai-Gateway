@@ -1,5 +1,5 @@
 {% from 'provider_identity.html' import provider_logo, provider_name %}
-{% from 'model_pricing.html' import savings_badge, reference_price, pricing_note %}
+{% from 'model_pricing.html' import savings_badge, premium_prices, pricing_note %}
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -21,8 +21,8 @@
     <link rel="icon" href="/static/favicon.ico" sizes="any">
     <link rel="icon" type="image/svg+xml" href="/static/brand.svg">
     <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-    <link rel="stylesheet" href="/static/design.css?v=6">
-    <link rel="stylesheet" href="/static/console.css?v=12">
+    <link rel="stylesheet" href="/static/design.css?v=8">
+    <link rel="stylesheet" href="/static/console.css?v=15">
     <script src="/static/console.js?v=11" defer></script>
 </head>
 <body class="portal-ui console-app text-zinc-100 min-h-screen antialiased" data-console-kind="developer">
@@ -111,14 +111,14 @@ response = client.chat.completions.create(
 
         <!-- Section: xHigh Models (Premium) -->
         <div id="model-library" data-console-view="models" class="console-panel console-models">
-            <div class="console-models-heading"><div><h2>Premium intelligence</h2><p>Input / output pricing per 1M tokens. Daily trials where available.</p></div><span class="console-tier">{{ 'Trial available' if any_trial_remaining else 'Wallet billing' }}</span></div>
+            <div class="console-models-heading"><div><h2>Premium intelligence</h2><p>Transparent pricing. Daily trials where available.</p></div><span class="console-tier">{{ 'Trial available' if any_trial_remaining else 'Wallet billing' }}</span></div>
 
             <!-- Premium Models Grid -->
             <div id="premium-models-grid">
                 {% for m in premium_models %}
                 <div class="premium-model-item console-model-row" data-model="{{ m.id }}" data-library-model="{{ m.id }} {{ provider_name(m.id, m.provider) }}" data-library-tier="premium">
                     <div class="console-model-identity">{{ provider_logo(m.id, m.provider, 'console-model-logo') }}<div><div class="console-model-title"><strong>{{ m.name }}</strong>{{ savings_badge(m) }}</div><small>{{ provider_name(m.id, m.provider) }} · {{ m.tag }}</small></div></div>
-                    <div class="console-model-pricing"><div><small>Input / 1M</small><strong>${{ "%g"|format(m.price_in_usd) }}</strong>{{ reference_price(m.price_in_usd, m.official_in_usd) }}</div><div><small>Output / 1M</small><strong>${{ "%g"|format(m.price_out_usd) }}</strong>{{ reference_price(m.price_out_usd, m.official_out_usd) }}</div></div>
+                    <div class="console-model-pricing premium-rates">{{ premium_prices(m) }}</div>
                     {% set tr = trial_by_model.get(m.id) %}
                     {% if tr and tr.limit > 0 %}
                     <div class="console-trial"><div class="console-trial-label">Daily trial <span>{{ "{:,}".format(tr.remaining) }} left</span></div><div class="console-trial-bar" role="progressbar" aria-label="{{ m.name }} trial used" aria-valuenow="{{ tr.pct }}" aria-valuemin="0" aria-valuemax="100"><div style="width: {{ tr.pct }}%"></div></div><small>{{ "{:,}".format(tr.used) }} / {{ "{:,}".format(tr.limit) }} · resets 00:00 ICT</small></div>

@@ -14,6 +14,21 @@
 {% if current | price_savings(reference) %}<small class="price-reference">Reference <s>${{ "%g" | format(reference) }}</s></small>{% endif %}
 {%- endmacro %}
 
+{% macro cached_input_price(model) -%}
+{% if model.price_cached_in_usd is defined and model.price_cached_in_usd is not none %}
+<div class="model-rate-cell cached-input-price"><small title="Customer price per 1 million input tokens reported as cache reads by the provider">Cached input</small><strong>${{ "%g" | format(model.price_cached_in_usd) }}</strong><span class="model-rate-caption">Cache reads</span></div>
+{% endif %}
+{%- endmacro %}
+
+{% macro premium_prices(model) -%}
+<span class="model-rate-unit">USD / 1M tokens</span>
+<div class="model-rate-grid">
+    <div class="model-rate-cell"><small>Input</small><strong>${{ "%g" | format(model.price_in_usd) }}</strong>{{ reference_price(model.price_in_usd, model.official_in_usd) }}</div>
+    <div class="model-rate-cell"><small>Output</small><strong>${{ "%g" | format(model.price_out_usd) }}</strong>{{ reference_price(model.price_out_usd, model.official_out_usd) }}</div>
+    {{ cached_input_price(model) }}
+</div>
+{%- endmacro %}
+
 {% macro pricing_note() -%}
-<p class="pricing-note">Savings compare our prices with catalog reference rates, not a previous Gateway price. Reference rates are not verified official prices. All rates are USD per 1M tokens.</p>
+<p class="pricing-note">Savings compare our prices with catalog reference rates, not a previous Gateway price. Reference rates are not verified official prices. All rates are USD per 1M tokens. Cached input rates apply only to input tokens reported as cache reads by the provider.</p>
 {%- endmacro %}

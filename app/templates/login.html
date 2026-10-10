@@ -1,5 +1,5 @@
 {% from 'provider_identity.html' import provider_logo, provider_name %}
-{% from 'model_pricing.html' import savings_badge, reference_price, pricing_note %}
+{% from 'model_pricing.html' import savings_badge, premium_prices, pricing_note %}
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -20,7 +20,7 @@
     <link rel="icon" href="/static/favicon.ico" sizes="any">
     <link rel="icon" type="image/svg+xml" href="/static/brand.svg">
     <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-    <link rel="stylesheet" href="/static/design.css?v=6">
+    <link rel="stylesheet" href="/static/design.css?v=8">
     <link rel="stylesheet" href="/static/product-preview.css?v=4">
     <script src="/static/site.js?v=3" defer onerror="document.documentElement.classList.remove('reveal-ready')"></script>
 </head>
@@ -54,7 +54,7 @@
             <div class="section-heading reveal"><span class="eyebrow">THE RIGHT MODEL FOR THE MOMENT</span><h2>More intelligence.<br>Fewer compromises.</h2><p>Start with unlimited free models.<br>Reach for premium when your work calls for more.</p></div>
             <div class="model-table reveal"><div class="model-table-head"><span>Model / Provider</span><span>Access</span><span>Input / Output per 1M tokens</span></div>
                 {% for model in free_models %}{% set provider = 'DeepSeek' if 'deepseek' in model|lower else 'Z.ai' if 'glm' in model|lower else 'MiniMax' %}<div class="model-table-row"><div class="model-table-name">{{ provider_logo(model, provider, 'model-glyph') }}<div><h3>{{ model }}</h3><span>{{ provider }}</span></div></div><span class="model-tag">Unlimited free</span><span class="model-price">$0.00 <small>Always free</small></span></div>{% endfor %}
-                {% for model in premium_models %}<div class="model-table-row premium-price-row"><div class="model-table-name">{{ provider_logo(model.id, model.provider, 'model-glyph premium-glyph') }}<div><h3>{{ model.id }}</h3><span>{{ provider_name(model.id, model.provider) }}</span></div></div><div class="model-access"><span class="model-tag premium-tag">Premium</span>{{ savings_badge(model) }}</div><div class="model-price model-price-comparison"><div><small>Input / 1M</small><strong>${{ "%g" | format(model.price_in_usd) }}</strong>{{ reference_price(model.price_in_usd, model.official_in_usd) }}</div><div><small>Output / 1M</small><strong>${{ "%g" | format(model.price_out_usd) }}</strong>{{ reference_price(model.price_out_usd, model.official_out_usd) }}</div></div></div>{% endfor %}
+                {% for model in premium_models %}<div class="model-table-row premium-price-row"><div class="model-table-name">{{ provider_logo(model.id, model.provider, 'model-glyph premium-glyph') }}<div><h3>{{ model.id }}</h3><span>{{ provider_name(model.id, model.provider) }}</span></div></div><div class="model-access"><span class="model-tag premium-tag">Premium</span>{{ savings_badge(model) }}</div><div class="model-price model-price-comparison premium-rates">{{ premium_prices(model) }}</div></div>{% endfor %}
             </div>
             {{ pricing_note() }}
         </section>

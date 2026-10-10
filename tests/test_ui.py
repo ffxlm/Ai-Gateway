@@ -46,11 +46,14 @@ class PortalUITests(unittest.TestCase):
         for model in FREE_MODELS + [m["id"] for m in PREMIUM_MODELS]:
             self.assertIn(model, response.text)
         for model in PREMIUM_MODELS:
-            for field in ["price_in_usd", "price_out_usd"]:
+            for field in ["price_in_usd", "price_out_usd", "price_cached_in_usd"]:
                 self.assertIn(f'<strong>${model[field]:g}</strong>', response.text)
             for field in ["official_in_usd", "official_out_usd"]:
                 self.assertIn(f'<s>${model[field]:g}</s>', response.text)
         self.assertEqual(response.text.count('Save 90%'), len(PREMIUM_MODELS))
+        self.assertEqual(response.text.count('class="model-rate-cell cached-input-price"'), len(PREMIUM_MODELS))
+        self.assertIn('Cached input', response.text)
+        self.assertEqual(response.text.count('class="model-rate-unit"'), len(PREMIUM_MODELS))
         self.assertIn("Reference rates are not verified official prices", response.text)
         self.assertIn('/auth/discord/login', response.text)
         self.assertIn('from</span> openai', response.text)
@@ -135,6 +138,17 @@ class PortalUITests(unittest.TestCase):
         response = self.client.get("/login?error=%3Cscript%3Ealert(1)%3C/script%3E")
         self.assertNotIn("<script>alert(1)</script>", response.text)
 
+    def test_cached_input_prices_use_catalog_and_hide_unconfigured_rates(self):
+        pricing = templates.env.get_template("model_pricing.html").module
+        for model in PREMIUM_MODELS:
+            html = str(pricing.cached_input_price(model))
+            self.assertIn('Cached input', html)
+            self.assertIn(f'<strong>${model["price_cached_in_usd"]:g}</strong>', html)
+            self.assertNotIn('<s>', html)
+        for model in [{}, {"price_cached_in_usd": None}]:
+            self.assertEqual(str(pricing.cached_input_price(model)).strip(), '')
+        self.assertIn('<strong>$0</strong>', str(pricing.cached_input_price({"price_cached_in_usd": 0})))
+
     def test_dashboard_preserves_credentials_and_actions(self):
         self.mock("get_session_user", return_value=USER)
         self.mock("get_user_analytics", return_value=ANALYTICS)
@@ -155,7 +169,12 @@ class PortalUITests(unittest.TestCase):
         for icon in ["deepseek", "zai", "minimax", "openai"]:
             self.assertIn(f'/static/providers/{icon}.svg', response.text)
         self.assertEqual(response.text.count('Save 90%'), len(PREMIUM_MODELS))
+        self.assertEqual(response.text.count('class="model-rate-cell cached-input-price"'), len(PREMIUM_MODELS))
+        self.assertIn('Cached input', response.text)
+        self.assertEqual(response.text.count('class="model-rate-unit"'), len(PREMIUM_MODELS))
+        self.assertIn('Cached input rates apply only to input tokens reported as cache reads', response.text)
         for model in PREMIUM_MODELS:
+            self.assertIn(f'<strong>${model["price_cached_in_usd"]:g}</strong>', response.text)
             for field in ["official_in_usd", "official_out_usd"]:
                 self.assertIn(f'<s>${model[field]:g}</s>', response.text)
         self.assertIn("Z.ai", response.text)
