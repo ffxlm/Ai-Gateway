@@ -20,7 +20,7 @@
     <link rel="icon" href="/static/favicon.ico" sizes="any">
     <link rel="icon" type="image/svg+xml" href="/static/brand.svg">
     <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-    <link rel="stylesheet" href="/static/design.css?v=8">
+    <link rel="stylesheet" href="/static/design.css?v=9">
     <link rel="stylesheet" href="/static/product-preview.css?v=4">
     <script src="/static/site.js?v=3" defer onerror="document.documentElement.classList.remove('reveal-ready')"></script>
 </head>
@@ -52,11 +52,37 @@
         </section>
         <section class="models-section container" id="models">
             <div class="section-heading reveal"><span class="eyebrow">THE RIGHT MODEL FOR THE MOMENT</span><h2>More intelligence.<br>Fewer compromises.</h2><p>Start with unlimited free models.<br>Reach for premium when your work calls for more.</p></div>
-            <div class="model-table reveal"><div class="model-table-head"><span>Model / Provider</span><span>Access</span><span>Input / Output per 1M tokens</span></div>
-                {% for model in free_models %}{% set provider = 'DeepSeek' if 'deepseek' in model|lower else 'Z.ai' if 'glm' in model|lower else 'MiniMax' %}<div class="model-table-row"><div class="model-table-name">{{ provider_logo(model, provider, 'model-glyph') }}<div><h3>{{ model }}</h3><span>{{ provider }}</span></div></div><span class="model-tag">Unlimited free</span><span class="model-price">$0.00 <small>Always free</small></span></div>{% endfor %}
-                {% for model in premium_models %}<div class="model-table-row premium-price-row"><div class="model-table-name">{{ provider_logo(model.id, model.provider, 'model-glyph premium-glyph') }}<div><h3>{{ model.id }}</h3><span>{{ provider_name(model.id, model.provider) }}</span></div></div><div class="model-access"><span class="model-tag premium-tag">Premium</span>{{ savings_badge(model) }}</div><div class="model-price model-price-comparison premium-rates">{{ premium_prices(model) }}</div></div>{% endfor %}
-            </div>
-            {{ pricing_note() }}
+            <section class="catalog-group catalog-free reveal" id="free-models" aria-labelledby="free-models-title">
+                <header class="catalog-group-heading">
+                    <div><span class="catalog-tier-label"><span aria-hidden="true"></span>BUILD WITHOUT THE BILL</span><h3 id="free-models-title">Free models</h3><p>Unlimited access. No wallet balance required.</p></div>
+                    <span class="catalog-model-count">{{ free_models|length }} models</span>
+                </header>
+                <div class="catalog-free-grid">
+                    {% for model in free_models %}
+                    {% set provider = 'DeepSeek' if 'deepseek' in model|lower else 'Z.ai' if 'glm' in model|lower else 'MiniMax' %}
+                    <article class="catalog-free-card">
+                        <div class="model-table-name">{{ provider_logo(model, provider, 'model-glyph') }}<div><h4>{{ model }}</h4><span>{{ provider }}</span></div></div>
+                        <span class="catalog-free-access"><span aria-hidden="true">✓</span>Unlimited free</span>
+                    </article>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="catalog-group catalog-premium reveal" id="premium-models" aria-labelledby="premium-models-title">
+                <header class="catalog-group-heading">
+                    <div><span class="catalog-tier-label"><span aria-hidden="true"></span>MORE POWER. CLEAR PRICING.</span><h3 id="premium-models-title">Premium models</h3><p>Pay per token from your wallet. Daily trials where available.</p></div>
+                    <span class="catalog-model-count">{{ premium_models|length }} models</span>
+                </header>
+                <div class="catalog-premium-list">
+                    {% for model in premium_models %}
+                    <article class="model-table-row premium-price-row catalog-premium-row">
+                        <div class="model-table-name">{{ provider_logo(model.id, model.provider, 'model-glyph premium-glyph') }}<div><div class="catalog-model-title"><h4>{{ model.id }}</h4>{{ savings_badge(model) }}</div><span>{{ provider_name(model.id, model.provider) }}</span></div></div>
+                        <div class="model-price model-price-comparison premium-rates">{{ premium_prices(model) }}</div>
+                    </article>
+                    {% endfor %}
+                </div>
+                <div class="catalog-pricing-note">{{ pricing_note() }}</div>
+            </section>
         </section>
         <section class="developer-section container" id="developers">
             <div class="developer-copy reveal"><span class="eyebrow">MADE FOR DEVELOPERS</span><h2>Feels familiar.<br>Works beautifully.</h2><p>No new SDK to learn. No workflow to rebuild.<br>Set your base URL, add your key, and make your first request.</p><ul class="developer-checks"><li><span>✓</span> OpenAI-compatible chat completions</li><li><span>✓</span> Real-time streaming support</li><li><span>✓</span> Usage analytics and per-request metering</li></ul><a class="text-link" href="/auth/discord/login">Get your API key <span aria-hidden="true">→</span></a></div>

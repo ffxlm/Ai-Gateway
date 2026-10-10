@@ -134,4 +134,43 @@ a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
     .premium-rates .model-rate-cell { padding: 14px 12px; }
 }
 @media (max-width:380px) { .premium-price-row .model-table-name { grid-column: 1 / -1; }.premium-price-row .model-access { grid-column: 1 / -1; grid-row: 2; flex-direction: row; align-items: center; }.premium-price-row .model-price-comparison { grid-row: 3; }.premium-rates .model-rate-cell { padding-inline: 9px; } }
+/* Public catalog: free access and wallet billing have their own clear spaces. */
+.catalog-group { border: 1px solid #292a32; border-radius: 12px; overflow: hidden; background: #101115; }
+.catalog-group + .catalog-group { margin-top: 24px; }
+.catalog-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 26px 28px; border-bottom: 1px solid #292a32; }
+.catalog-tier-label { display: flex; align-items: center; gap: 8px; color: #99bea9; font-size: 9px; font-weight: 500; letter-spacing: 1px; }
+.catalog-tier-label > span { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.catalog-group-heading h3 { margin: 11px 0 7px; color: #eeeff3; font-size: 22px; font-weight: 500; letter-spacing: -.5px; }
+.catalog-group-heading p { margin: 0; color: #858895; font-size: 12px; line-height: 1.7; }
+.catalog-model-count { flex-shrink: 0; padding: 6px 10px; border: 1px solid #303137; border-radius: 6px; font-size: 10px; color: #979aa6; background: #ffffff02; }
+.catalog-free .catalog-group-heading { background: linear-gradient(110deg,#83ad9206,transparent 65%); }
+.catalog-premium .catalog-group-heading { background: linear-gradient(110deg,#a3a1ed08,transparent 65%); }
+.catalog-premium .catalog-tier-label { color: #b7b5f5; }
+.catalog-free-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; padding: 22px 28px; }
+.catalog-free-card { min-width: 0; padding: 20px; border: 1px solid #292c32; border-radius: 8px; background: #ffffff02; }
+.catalog-group .model-table-name > div { min-width: 0; }
+.catalog-group .model-table-name h4 { margin: 0 0 6px; font-size: 13px; font-weight: 500; color: #eeeff3; overflow-wrap: anywhere; }
+.catalog-free-access { display: flex; align-items: center; gap: 7px; margin-top: 18px; padding-top: 14px; border-top: 1px solid #ffffff08; color: #99bea9; font-size: 10px; }
+.catalog-free-access > span { color: #82ae95; font-size: 11px; }
+.catalog-premium-row { grid-template-columns: minmax(0,1fr) minmax(300px,.85fr); gap: 36px; padding: 24px 28px; background: transparent; }
+.catalog-premium-row:first-child { border-top: 0; }
+.catalog-model-title { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-bottom: 7px; }
+.catalog-group .catalog-model-title h4 { margin: 0; }
+.catalog-pricing-note { padding: 16px 28px; border-top: 1px solid #292a32; background: #ffffff01; }
+.catalog-pricing-note .pricing-note { margin: 0; max-width: 900px; }
+@media (max-width:1000px) { .catalog-free-grid { gap: 10px; }.catalog-free-card { padding: 16px; }.catalog-free-card .model-table-name { align-items: flex-start; gap: 10px; }.catalog-premium-row { gap: 24px; } }
+@media (max-width:760px) {
+    .catalog-group-heading { padding: 22px 20px; gap: 16px; align-items: flex-start; }
+    .catalog-group-heading h3 { font-size: 20px; }.catalog-group-heading p { font-size: 11px; }.catalog-tier-label { font-size: 8px; letter-spacing: .7px; }
+    .catalog-model-count { padding: 5px 8px; font-size: 9px; }
+    .catalog-free-grid { grid-template-columns: 1fr; padding: 16px; gap: 10px; }
+    .catalog-free-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding: 16px; }
+    .catalog-free-card .model-table-name { align-items: center; flex: 1; min-width: 180px; }
+    .catalog-free-access { margin: 0; padding: 0; border: 0; font-size: 9px; }
+    .catalog-premium-row { grid-template-columns: minmax(0,1fr); gap: 20px; padding: 22px 20px; }
+    .catalog-premium-row .model-table-name { grid-column: 1; grid-row: 1; }
+    .catalog-premium-row .model-price-comparison { grid-column: 1; grid-row: 2; }
+    .catalog-pricing-note { padding: 16px 20px; }
+}
+@media (max-width:380px) { .catalog-group-heading { padding-inline: 16px; }.catalog-premium-row { padding-inline: 16px; }.catalog-free-card { padding: 14px; }.catalog-free-access { margin-left: 45px; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }.reveal-ready .reveal { opacity: 1; transform: none; } }

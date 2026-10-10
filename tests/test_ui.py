@@ -80,6 +80,28 @@ class PortalUITests(unittest.TestCase):
         self.assertIn("226,000 tokens in total", preview)
         self.assertNotIn(USER["api_key"], preview)
 
+    def test_landing_separates_free_access_from_premium_pricing(self):
+        self.mock("get_session_user", return_value=None)
+        html = self.client.get('/login').text
+        free = html.split('id="free-models"', 1)[1].split('id="premium-models"', 1)[0]
+        premium = html.split('id="premium-models"', 1)[1].split('id="developers"', 1)[0]
+        self.assertIn('aria-labelledby="free-models-title"', free)
+        self.assertIn('aria-labelledby="premium-models-title"', premium)
+        self.assertIn('No wallet balance required', free)
+        self.assertIn('Pay per token from your wallet', premium)
+        self.assertEqual(free.count('class="catalog-free-card"'), len(FREE_MODELS))
+        self.assertEqual(premium.count('catalog-premium-row'), len(PREMIUM_MODELS))
+        self.assertNotIn('$0.00', free)
+        self.assertNotIn('model-rate-grid', free)
+        for model in FREE_MODELS:
+            self.assertIn(model, free)
+            self.assertNotIn(f'<h4>{model}</h4>', premium)
+        for model in PREMIUM_MODELS:
+            self.assertNotIn(model['id'], free)
+            self.assertIn(model['id'], premium)
+            for field in ['price_in_usd', 'price_out_usd', 'price_cached_in_usd']:
+                self.assertIn(f'<strong>${model[field]:g}</strong>', premium)
+
     def test_public_preview_uses_current_console_palette(self):
         self.mock("get_session_user", return_value=None)
         self.assertIn('/static/product-preview.css?v=4', self.client.get('/login').text)
