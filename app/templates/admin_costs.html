@@ -1,0 +1,29 @@
+<section id="costs" data-console-view="costs" class="margin-workspace" data-reconcile-root>
+    <div class="margin-toolbar">
+        <div class="margin-readonly"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i>Read-only report <span>Never changes customer billing</span></div>
+        <div class="margin-actions">
+            <label class="sr-only" for="margin-days">Report period</label>
+            <select id="margin-days" data-reconcile-days>
+                <option value="1">Today (UTC)</option>
+                <option value="7" selected>Last 7 days</option>
+                <option value="30">Last 30 days</option>
+            </select>
+            <button type="button" data-reconcile-run class="console-button margin-refresh"><i class="fa-solid fa-rotate" aria-hidden="true"></i>Refresh report</button>
+        </div>
+    </div>
+    <p data-reconcile-status class="margin-status" role="status">Loading report…</p>
+    <div data-reconcile-result>
+        <div class="margin-cards" aria-label="Premium financial summary">
+            <article class="margin-card"><span>Customer revenue</span><strong>—</strong><p>Settled premium usage</p></article>
+            <article class="margin-card"><span>Measured upstream cost</span><strong>—</strong><p>Paid usage and free trials</p></article>
+            <article class="margin-card margin-card-featured"><span>Gross margin</span><strong>—</strong><p>Revenue minus measured cost</p></article>
+        </div>
+    </div>
+    <details class="margin-details margin-measurement">
+        <summary><i class="fa-solid fa-sliders" aria-hidden="true"></i>Measurement settings<span>Report scope only</span></summary>
+        <div class="margin-settings-body">
+            <div><h3>Measurement start</h3><p data-reconcile-epoch-note>{% if metrics_epoch %}Measuring since {{ metrics_epoch }} — older requests are kept but not counted.{% else %}Measuring from the start of the selected window.{% endif %}</p><p>Starting fresh excludes older requests from this report. Request history, wallet balances, and billing stay unchanged.</p></div>
+            <button type="button" data-reconcile-epoch class="console-button">Start measuring fresh</button>
+        </div>
+    </details>
+</section>

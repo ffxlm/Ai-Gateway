@@ -185,6 +185,23 @@ class PortalUITests(unittest.TestCase):
         self.assertIn("data-reconcile-run", admin_response.text)
         self.assertIn("data-reconcile-epoch", admin_response.text)
         self.assertIn("data-reconcile-epoch-note", admin_response.text)
+        self.assertIn('href="/admin#costs" data-console-nav="costs"', admin_response.text)
+        self.assertIn('id="costs" data-console-view="costs"', admin_response.text)
+        self.assertIn('data-margin-summary="revenue"', admin_response.text)
+        self.assertIn('data-margin-summary="cost"', admin_response.text)
+        self.assertIn('data-margin-summary="margin"', admin_response.text)
+        self.assertIn('href="#costs">View details', admin_response.text)
+        self.assertIn('<details class="margin-details margin-measurement">', admin_response.text)
+        wallet_panel = admin_response.text.split('id="reconciliation"', 1)[1].split('id="costs"', 1)[0]
+        self.assertNotIn('data-reconcile-root', wallet_panel)
+        self.assertNotIn('data-reconcile-epoch', wallet_panel)
+        script = self.client.get('/static/console.js').text
+        self.assertIn("costs: ['Costs & margin'", script)
+        self.assertIn('Different measurement windows', script)
+        self.assertIn('not profit or loss', script)
+        self.assertIn("daysSel.addEventListener('change', run)", script)
+        self.assertNotIn("window.confirm('Start measuring fresh", script)
+        self.assertIn('data-active-view="costs"', self.client.get('/static/console.css').text)
         # The endpoint is fetched from the console script, not inlined in the page.
         self.assertIn("/api/admin/reconcile", self.client.get("/static/console.js").text)
         self.assertIn("/api/admin/metrics-epoch", self.client.get("/static/console.js").text)

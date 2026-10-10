@@ -8,7 +8,7 @@
     if (kind !== 'developer' && kind !== 'admin') return;
     var views = kind === 'developer'
         ? ['overview', 'models', 'api', 'usage', 'wallet']
-        : ['overview', 'members', 'ledger', 'reconciliation', 'payments', 'settings'];
+        : ['overview', 'members', 'ledger', 'reconciliation', 'costs', 'payments', 'settings'];
     var aliases = { 'model-library': 'models', credentials: 'api', 'usage-analytics': 'usage', 'wallet-activity': 'wallet' };
     var hash = location.hash.slice(1);
     try { hash = decodeURIComponent(hash); } catch (error) { hash = ''; }
@@ -36,6 +36,7 @@
         <a href="/admin/requests" {% if console_kind == 'audit' %}class="is-active" aria-current="page"{% endif %}><i class="fa-solid fa-list-check" aria-hidden="true"></i>Request audit</a>
         <a href="/admin#ledger" {% if console_kind == 'admin' %}data-console-nav="ledger"{% endif %}><i class="fa-solid fa-receipt" aria-hidden="true"></i>Wallet ledger</a>
         <a href="/admin#reconciliation" {% if console_kind == 'admin' %}data-console-nav="reconciliation"{% endif %}><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>Reconciliation</a>
+        <a href="/admin#costs" {% if console_kind == 'admin' %}data-console-nav="costs"{% endif %}><i class="fa-solid fa-arrow-trend-up" aria-hidden="true"></i>Costs &amp; margin</a>
         <a href="/admin#payments" {% if console_kind == 'admin' %}data-console-nav="payments"{% endif %}><i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i>Payments</a>
         <a href="/admin#settings" {% if console_kind == 'admin' %}data-console-nav="settings"{% endif %}><i class="fa-solid fa-sliders" aria-hidden="true"></i>System settings</a>
         {% endif %}

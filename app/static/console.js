@@ -12,6 +12,7 @@
         members: ['Members', 'Manage accounts, access, and prepaid balances.'],
         ledger: ['Wallet ledger', 'A transparent record of every credit and charge.'],
         reconciliation: ['Reconciliation', 'Verify stored balances against your financial ledger.'],
+        costs: ['Costs & margin', 'Understand premium revenue, provider costs, and the margin in between.'],
         payments: ['Payments', 'Verified top-ups and their payment references.'],
         settings: ['System settings', 'Fine-tune your gateway. Changes take effect immediately.'],
     };
@@ -186,78 +187,109 @@
         const out = reconcileRoot.querySelector('[data-reconcile-result]');
         const epochBtn = reconcileRoot.querySelector('[data-reconcile-epoch]');
         const epochNote = reconcileRoot.querySelector('[data-reconcile-epoch-note]');
+        const status = reconcileRoot.querySelector('[data-reconcile-status]');
+        const summaryNote = document.querySelector('[data-margin-summary-note]');
+        let busy = false;
         const usd = n => '$' + Number(n || 0).toFixed(6);
         const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-        const cell = (label, value, cls) => `<div class="px-3 py-1"><div class="text-[11px] uppercase tracking-wider text-zinc-400">${label}</div><div class="font-mono ${cls || 'text-zinc-200'}">${value}</div></div>`;
+        const count = n => Number(n || 0).toLocaleString('en-US');
+        const cell = (label, value, note, cls = '') => `<article class="margin-card ${cls}"><span>${label}</span><strong>${value}</strong><p>${note}</p></article>`;
+        const stat = (label, value, note = '') => `<div><dt>${label}</dt><dd>${value}</dd>${note ? `<small>${note}</small>` : ''}</div>`;
+        const setBusy = value => {
+            busy = value;
+            runBtn.disabled = daysSel.disabled = epochBtn.disabled = value;
+            runBtn.innerHTML = value ? '<i class="fa-solid fa-rotate fa-spin" aria-hidden="true"></i>Refreshing…' : '<i class="fa-solid fa-rotate" aria-hidden="true"></i>Refresh report';
+            out.setAttribute('aria-busy', String(value));
+        };
         const showEpoch = epoch => {
             if (!epochNote) return;
-            epochNote.innerHTML = epoch
-                ? `Measuring fresh since <span class="font-mono text-zinc-300">${esc(epoch)}</span> — older requests are kept but not counted.`
-                : 'Measuring from the start of the selected window (no fresh epoch set).';
+            epochNote.textContent = epoch
+                ? `Measuring since ${epoch} — older requests are kept but not counted.`
+                : 'Measuring from the start of the selected window.';
         };
         const render = d => {
             const p = d.portal;
             const m = d.margin || {};
-            const cells = [];
-            cells.push(cell('Billed (customers)', usd(p.billed_usd), 'text-emerald-400'));
             const measured = (m.measured_cost_usd !== undefined && m.measured_cost_usd !== null) ? m.measured_cost_usd : p.observed_upstream_usd;
-            cells.push(cell('Cost (measured)', usd(measured), 'text-amber-300'));
-            if (d.upstream) {
-                const bg = m.business_gross_usd;
-                const hasBg = (bg !== undefined && bg !== null);
-                cells.push(cell('Business margin', hasBg ? `${usd(bg)}${m.business_ratio ? ` · ${m.business_ratio}x` : ''}` : '—', hasBg ? (bg >= 0 ? 'text-emerald-400' : 'text-rose-400') : 'text-zinc-500'));
-            } else {
-                cells.push(cell('Business margin', '—', 'text-zinc-500'));
-            }
+            const bg = m.business_gross_usd;
+            const hasBg = bg !== undefined && bg !== null;
+            const hasMargin = Object.hasOwn(m, 'paid_gross_usd');
+            const marginClass = hasBg ? (bg >= 0 ? 'margin-positive' : 'margin-negative') : '';
+            const cards = [
+                cell('Customer revenue', usd(p.billed_usd), 'Settled premium usage', 'margin-positive'),
+                cell('Measured upstream cost', usd(measured), 'Paid usage and free trials', 'margin-cost'),
+                cell('Gross margin', hasBg ? usd(bg) : '—', 'Revenue minus measured cost · before overhead', `margin-card-featured ${marginClass}`),
+            ];
+            const period = daysSel.selectedOptions[0].textContent;
+            document.querySelectorAll('[data-margin-summary]').forEach(el => {
+                const key = el.dataset.marginSummary;
+                el.textContent = { revenue: usd(p.billed_usd), cost: usd(measured), margin: hasBg ? usd(bg) : '—' }[key];
+                el.classList.toggle('margin-negative', key === 'margin' && hasBg && bg < 0);
+                el.classList.toggle('margin-positive', key === 'margin' && hasBg && bg >= 0);
+            });
+            summaryNote.textContent = `${period} · ${count(p.requests)} premium requests${d.measurement?.epoch_after_window_start ? ' · Measurement start limits this period' : ''}${d.upstream_error ? ' · Upstream unavailable' : ''}`;
             const notes = [];
+            const accountStats = [];
             if (d.account) {
-                const pending = d.account.fiat_pending_usdc > 0
-                    ? ` · <span class="text-zinc-500">pending</span> <span class="font-mono text-zinc-300">${usd(d.account.fiat_pending_usdc)}</span>`
-                    : '';
-                notes.push(`InferHub balance: <span class="font-mono text-emerald-400">${usd(d.account.balance_usdc)}</span>${pending}`);
+                accountStats.push(stat('InferHub balance', usd(d.account.balance_usdc), 'Current account balance'));
+                accountStats.push(stat('Pending funds', usd(d.account.fiat_pending_usdc), 'Not yet settled'));
             } else if (d.account_error) {
-                notes.push(`<span class="text-zinc-500">InferHub balance unavailable: ${esc(d.account_error)}</span>`);
+                notes.push(`<p>InferHub balance unavailable: ${esc(d.account_error)}</p>`);
             }
-            notes.push(`Paid margin: <span class="font-mono text-zinc-300">${usd(m.paid_gross_usd || 0)}</span> · Trial cost (free): <span class="font-mono text-zinc-300">${usd(m.trial_cost_usd || 0)}</span>`);
-            notes.push(`Portal premium requests: <span class="font-mono text-zinc-300">${p.requests}</span> · tokens in/out/cached: <span class="font-mono text-zinc-300">${p.tokens_in}/${p.tokens_out}/${p.tokens_cached}</span>`);
+            let warning = '';
             if (d.upstream) {
                 const gap = m.observed_vs_upstream_gap_usd || 0;
-                const gapCls = Math.abs(gap) > 0.01 ? 'text-amber-300' : 'text-zinc-400';
-                notes.push(`Cross-check — <span class="text-zinc-300">whole account</span> spent <span class="font-mono text-zinc-300">${usd(d.upstream.cost_usdc)}</span> <span class="text-zinc-500">(all keys · full window, not just the portal)</span> · <span class="${gapCls}">gap vs measured ${usd(gap)}</span>`);
+                accountStats.push(stat('Whole-account spend', usd(d.upstream.cost_usdc), 'All keys · full selected window'));
+                accountStats.push(stat('Observed cost − account spend', usd(gap), 'Cross-check only · not profit or loss'));
+                notes.push('<p>Account spend includes every key, not just portal traffic. This difference is a rough diagnostic signal, not a business margin.</p>');
                 if (d.measurement && d.measurement.epoch_after_window_start) {
-                    notes.push(`<span class="text-amber-300">⚠ The portal side counts only since the measurement epoch (${esc(d.measurement.effective_from_local)}), but the account total covers the whole window — so most of the gap is just that time mismatch, not a leak. Read it as a rough signal only.</span>`);
+                    warning = '<div class="margin-notice"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><div><strong>Different measurement windows</strong><p>The account cross-check covers a longer period. Its difference is not profit, loss, or proof of a leak. Expand provider cross-check for details.</p></div></div>';
+                    notes.push(`<p>Portal usage starts at ${esc(d.measurement.effective_from_local)}; account spend covers the whole selected window.</p>`);
                 }
             }
             if (p.estimated_requests > 0) {
                 const detail = p.estimated_cost_usd > 0
                     ? `priced at the measured average (${usd(p.estimated_cost_usd)})`
                     : 'unverifiable usage (never billed)';
-                notes.push(`<span class="text-amber-300">${p.estimated_requests} estimated request(s) — ${detail}.</span>`);
+                warning += `<div class="margin-notice"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><div><strong>Includes estimated usage</strong><p>${count(p.estimated_requests)} request(s) — ${detail}.</p></div></div>`;
             }
             if (d.upstream_error) {
-                notes.push(`<span class="text-rose-400">Upstream usage unavailable: ${esc(d.upstream_error)}</span>`);
+                warning += '<div class="margin-notice"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><div><strong>Provider usage unavailable</strong><p>Portal usage is still shown. Gross margin and trial cost are unavailable until the provider check succeeds.</p></div></div>';
+                notes.push(`<p>Upstream usage unavailable: ${esc(d.upstream_error)}</p>`);
             }
-            out.innerHTML = `<div class="grid grid-cols-3 divide-x divide-zinc-800/80 bg-zinc-950/70 rounded-lg border border-zinc-800/80 py-2 shadow-inner">${cells.join('')}</div>`
-                + `<div class="mt-3 space-y-1 text-[11px] text-zinc-400">${notes.map(n => `<div>${n}</div>`).join('')}</div>`;
+            const detailsOpen = out.querySelector('details')?.open;
+            out.innerHTML = `<div class="margin-cards">${cards.join('')}</div>${warning}
+                <section class="margin-usage"><div class="margin-section-heading"><h2>Premium usage</h2><span>${esc(period)} · portal traffic only</span></div>
+                <dl class="margin-usage-grid">${stat('Requests', count(p.requests))}${stat('Input tokens', count(p.tokens_in))}${stat('Output tokens', count(p.tokens_out))}${stat('Cached input tokens', count(p.tokens_cached), 'Reported cache reads · not a price')}</dl>
+                <dl class="margin-breakdown">${stat('Paid usage margin', hasMargin ? usd(m.paid_gross_usd) : '—', 'Excludes free-trial cost')}${stat('Free-trial cost', hasMargin ? usd(m.trial_cost_usd) : '—', 'Provider cost paid by the platform')}</dl></section>
+                <details class="margin-details" ${detailsOpen ? 'open' : ''}><summary><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>Provider cross-check<span>Account balances &amp; diagnostics</span></summary>
+                <div class="margin-details-body"><dl class="margin-account-grid">${accountStats.join('')}</dl><div class="margin-diagnostics">${notes.join('')}</div>
+                <p>Account window (UTC): ${esc(d.from_utc)} → ${esc(d.to_utc)}</p></div></details>`;
             if (d.measurement) showEpoch(d.measurement.epoch);
         };
         const run = async () => {
-            runBtn.disabled = true;
-            out.textContent = 'Running reconciliation…';
+            if (busy) return;
+            setBusy(true);
+            status.textContent = 'Refreshing report…';
             try {
                 const res = await fetch(`/api/admin/reconcile?days=${encodeURIComponent(daysSel.value)}`, { headers: { Accept: 'application/json' } });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const { data } = await res.json();
                 render(data);
+                status.textContent = `Updated ${new Date().toLocaleTimeString()} · All amounts in USD`;
             } catch (err) {
-                out.innerHTML = `<span class="text-rose-400">Reconciliation failed: ${esc(err.message)}</span>`;
-            } finally { runBtn.disabled = false; }
+                status.textContent = `Report refresh failed: ${err.message}. Retry with Refresh report. Any displayed values are from the previous update.`;
+                summaryNote.textContent = 'Report unavailable or out of date. Open details to retry.';
+            } finally { setBusy(false); }
         };
         runBtn.addEventListener('click', run);
+        daysSel.addEventListener('change', run);
         if (epochBtn) {
             epochBtn.addEventListener('click', async () => {
-                if (!window.confirm('Start measuring fresh from now?\n\nOld requests are kept but excluded from the margin. This only affects the report, never billing.')) return;
-                epochBtn.disabled = true;
+                if (busy) return;
+                const confirmed = await window.consoleActionDialog({ title: 'Start measuring fresh?', description: 'Count report usage only from now. Older requests remain in history but are excluded from the margin report. Wallet balances and customer billing will not change.', confirm: 'Start fresh measurement' });
+                if (!confirmed || busy) return;
+                setBusy(true);
                 try {
                     const res = await fetch('/api/admin/metrics-epoch', {
                         method: 'POST',
@@ -267,12 +299,14 @@
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
                     const { epoch } = await res.json();
                     showEpoch(epoch);
+                    setBusy(false);
                     await run();
                 } catch (err) {
-                    out.innerHTML = `<span class="text-rose-400">Could not start a fresh measurement: ${esc(err.message)}</span>`;
-                } finally { epochBtn.disabled = false; }
+                    status.textContent = `Could not start a fresh measurement: ${err.message}`;
+                } finally { setBusy(false); }
             });
         }
+        run();
     }
     // Associate legacy form labels without changing field names or API contracts.
     document.querySelectorAll('.console-app label').forEach((label, index) => {
