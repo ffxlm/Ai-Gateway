@@ -120,8 +120,9 @@ def portal_premium_totals(from_utc: datetime, to_utc: datetime,
     ``epoch_local`` is set, the window's lower bound is raised to it, so only
     requests from the fresh measurement point onward are counted.
     """
-    local_from = _to_local_naive(from_utc).strftime(_TS_FORMAT)
+    window_from = _to_local_naive(from_utc).strftime(_TS_FORMAT)
     local_to = _to_local_naive(to_utc).strftime(_TS_FORMAT)
+    local_from = window_from
     if epoch_local and epoch_local > local_from:
         local_from = epoch_local
 
@@ -204,6 +205,7 @@ def portal_premium_totals(from_utc: datetime, to_utc: datetime,
         "unbilled_usd": round(float(row["unbilled_usd"] or 0), 8),
         "from_local": local_from,
         "to_local": local_to,
+        "window_from_local": window_from,
     }
 
 
@@ -289,8 +291,13 @@ async def reconcile(days: int = 7) -> Dict[str, Any]:
         "measurement": {
             "epoch": epoch,
             "measuring_fresh": bool(epoch),
+            "window_from_local": portal["window_from_local"],
+            "window_to_local": portal["to_local"],
             "effective_from_local": portal["from_local"],
             "effective_to_local": portal["to_local"],
+            # True when the epoch clips the window's start, so the portal side
+            # covers a shorter period than the (whole-window) account total.
+            "epoch_after_window_start": bool(epoch and portal["from_local"] > portal["window_from_local"]),
         },
         "portal": portal,
         "upstream": upstream,

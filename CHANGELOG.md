@@ -5,6 +5,13 @@ Newest entries on top. Keep it short — facts, not prose.
 
 ## 2026-10-10
 
+- [done] Clarified the reconcile **cross-check** line: it is labelled "whole
+  account (all keys · full window, not just the portal)" and the card now warns
+  when the measurement epoch clips the window start (`epoch_after_window_start`),
+  because then the account total covers a longer period than the portal side and
+  the gap mostly reflects that time mismatch, not a leak. Also bumped
+  `console.js` cache-buster (`?v=8` → `?v=10`) — the reconcile card is rendered
+  by that script, so a stale cached copy kept showing the old labels.
 - [done] Added a **fresh measurement epoch** + honest business margin to the
   reconciliation. The provider only started returning per-request `usage.cost`
   recently, so every older row has `upstream_cost_usd = 0` and cannot be

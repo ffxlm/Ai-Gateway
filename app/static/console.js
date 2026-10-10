@@ -215,7 +215,10 @@
             if (d.upstream) {
                 const gap = m.observed_vs_upstream_gap_usd || 0;
                 const gapCls = Math.abs(gap) > 0.01 ? 'text-amber-300' : 'text-zinc-400';
-                notes.push(`Cross-check — account spent <span class="font-mono text-zinc-300">${usd(d.upstream.cost_usdc)}</span> · <span class="${gapCls}">gap vs measured ${usd(gap)}</span>`);
+                notes.push(`Cross-check — <span class="text-zinc-300">whole account</span> spent <span class="font-mono text-zinc-300">${usd(d.upstream.cost_usdc)}</span> <span class="text-zinc-500">(all keys · full window, not just the portal)</span> · <span class="${gapCls}">gap vs measured ${usd(gap)}</span>`);
+                if (d.measurement && d.measurement.epoch_after_window_start) {
+                    notes.push(`<span class="text-amber-300">⚠ The portal side counts only since the measurement epoch (${esc(d.measurement.effective_from_local)}), but the account total covers the whole window — so most of the gap is just that time mismatch, not a leak. Read it as a rough signal only.</span>`);
+                }
             }
             if (p.estimated_requests > 0) {
                 const detail = p.estimated_cost_usd > 0

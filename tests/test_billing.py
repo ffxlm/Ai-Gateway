@@ -577,6 +577,8 @@ class ReconcileTests(unittest.TestCase):
         self.assertAlmostEqual(m["business_gross_usd"], 0.008 - 0.003, places=9)
         self.assertAlmostEqual(m["paid_gross_usd"], 0.008 - 0.002, places=9)
         self.assertAlmostEqual(m["trial_cost_usd"], 0.001, places=9)
+        # Without an epoch there is no clip: the cross-check covers the same window.
+        self.assertFalse(data["measurement"]["epoch_after_window_start"])
 
     def test_estimated_request_is_priced_at_the_measured_average(self):
         from app.services import reconcile_service
@@ -626,6 +628,10 @@ class ReconcileTests(unittest.TestCase):
         self.assertAlmostEqual(data["portal"]["billed_usd"], 0.008, places=9)
         self.assertTrue(data["measurement"]["measuring_fresh"])
         self.assertEqual(data["measurement"]["epoch"], "2026-10-10 13:00:00")
+        # The epoch clips the window, so the account cross-check covers a longer
+        # period than the portal side; the UI must warn about that.
+        self.assertTrue(data["measurement"]["epoch_after_window_start"])
+        self.assertIn("window_from_local", data["measurement"])
 
     def test_metrics_epoch_endpoint_requires_admin_and_sets_epoch(self):
         from app.main import app
